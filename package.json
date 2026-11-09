@@ -1,0 +1,12 @@
+{
+  "name": "my-budget",
+  "version": "0.1.0",
+  "private": true,
+  "description": "My Budget – a calm personal budgeting web app. Data stays on your device.",
+  "type": "module",
+  "scripts": {
+    "test": "node --test \"tests/*.test.js\"",
+    "serve": "node tools/serve.mjs",
+    "icons": "node tools/make-icons.mjs"
+  }
+}
