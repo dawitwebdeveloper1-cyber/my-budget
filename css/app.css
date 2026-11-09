@@ -249,6 +249,69 @@ input[type="date"].input, input[type="time"].input { min-height: 50px; }
 }
 .toast button { padding: 8px 12px; border-radius: 10px; background: var(--field); font-weight: 600; }
 
+/* ---------- Stage 2 ---------- */
+.small { font-size: 13px; }
+.center { text-align: center; }
+.small-note { font-size: 13px; margin: 4px 0 12px; }
+.big-ish { font-size: 22px; }
+.calm { color: var(--text-dim); }
+.seg.small button { padding: 6px 0; font-size: 13px; }
+.calc-line { display: flex; align-items: center; justify-content: space-between; margin: -4px 0 14px; }
+.inline { display: flex; gap: 10px; align-items: center; }
+.grow { flex: 1; min-width: 0; }
+.btn.narrow { width: auto; padding: 13px 18px; margin: 0; }
+.btn.narrow + .btn { margin-top: 0; }
+.actions > p + .btn, .actions > .btn + p { margin-top: 10px; }
+.pct-input { position: relative; }
+.pct-input .input { padding-right: 34px; font-family: var(--serif); font-size: 20px; }
+.pct-input .cur-r { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); color: var(--text-dim); }
+
+.bar { height: 7px; border-radius: 4px; background: rgba(237, 230, 214, 0.09); overflow: hidden; margin: 10px 0 8px; }
+.bar i { display: block; height: 100%; border-radius: 4px; background: #8FB39A; transition: width .5s ease; }
+.bar i.gold { background: var(--gold); }
+.bar i.over { background: var(--coral); }
+
+.goal-list { display: flex; flex-direction: column; }
+.goal, .budget { display: block; width: 100%; text-align: left; padding: 14px 0; border-top: 1px solid var(--line); }
+.goal:first-child, .budget:first-child { border-top: 0; padding-top: 2px; }
+.goal-top { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.goal-name { font-size: 17px; }
+.goal-amts { margin-top: 6px; font-size: 15px; }
+.goal-amts .num { font-size: 20px; }
+.goal-foot { font-size: 13px; }
+.badge { font-size: 11.5px; padding: 4px 9px; border-radius: 999px; background: var(--field); color: var(--text-dim); white-space: nowrap; }
+.add-line { display: flex; align-items: center; gap: 8px; margin-top: 12px; padding: 10px 0 2px; color: var(--text-dim); font-size: 15px; border-top: 1px solid var(--line); width: 100%; }
+.add-line svg { width: 18px; height: 18px; }
+.budget-total { display: flex; justify-content: space-between; align-items: flex-end; gap: 10px; padding: 4px 0 16px; margin-bottom: 4px; border-bottom: 1px solid var(--line); }
+.free-list { margin-top: 10px; border-top: 1px solid var(--line); padding-top: 4px; }
+.free-list .row { grid-template-columns: 1fr auto; padding: 10px 0; }
+.list-in .entry:first-child { border-top: 0; padding-top: 2px; }
+
+.advice {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 10px;
+  padding: 12px 12px 12px 16px; margin: -2px 0 14px; border-radius: 16px;
+  background: rgba(237, 230, 214, 0.06); border: 1px solid var(--line);
+  font-size: 14px; color: var(--text-dim); line-height: 1.45;
+}
+.advice-x { flex: none; width: 26px; height: 26px; display: grid; place-items: center; color: var(--text-faint); border-radius: 8px; }
+.advice-x svg { width: 14px; height: 14px; }
+.recap-link {
+  display: flex; justify-content: space-between; align-items: center; width: 100%;
+  padding: 14px 18px; margin-bottom: 14px; border-radius: 16px;
+  background: var(--card); border: 1px solid var(--line); font-size: 15px;
+}
+.recap-link svg { width: 16px; height: 16px; color: var(--text-faint); }
+.recap-head { font-family: var(--serif); font-size: 20px; margin: 0 0 14px; }
+.facts { margin: 6px 0 0; padding-left: 18px; color: var(--text-dim); font-size: 14px; }
+.facts li { margin: 6px 0; }
+.card.flat { background: var(--field); box-shadow: none; }
+.snap-foot { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); flex-wrap: wrap; }
+.snap-diff { font-size: 14px; }
+.split { background: var(--field); border-radius: 16px; padding: 12px 16px; margin: 4px 0 12px; }
+.split .receipt-foot { margin-top: 8px; }
+.confirm-card .bar { margin: 12px auto 8px; max-width: 260px; }
+.confirm-card .how { margin-top: 6px; }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 1ms !important; transition-duration: 1ms !important; }
 }
