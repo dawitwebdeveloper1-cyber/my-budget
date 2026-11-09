@@ -21,6 +21,10 @@ export const DEFAULT_SETTINGS = {
   hourlyRateCents: null,  // remembered for the paycheck logger
   adviceOn: true,
   eventHour: 9,           // calendar events at 9:00 AM
+  alertDays: 1,           // calendar alert: 1 day before
+  alertMinutes: 60,       // and 1 hour before
+  backupReminder: true,
+  lastBackupAt: null,
 };
 
 export function freshState() {
@@ -137,6 +141,10 @@ export function cleanState(raw) {
   if (Number.isSafeInteger(st.hourlyRateCents) && st.hourlyRateCents > 0) t.hourlyRateCents = st.hourlyRateCents;
   if (typeof st.adviceOn === 'boolean') t.adviceOn = st.adviceOn;
   if (Number.isInteger(st.eventHour) && st.eventHour >= 0 && st.eventHour <= 23) t.eventHour = st.eventHour;
+  if ([0, 1, 2, 3, 7].includes(st.alertDays)) t.alertDays = st.alertDays;
+  if ([0, 15, 30, 60, 120].includes(st.alertMinutes)) t.alertMinutes = st.alertMinutes;
+  if (typeof st.backupReminder === 'boolean') t.backupReminder = st.backupReminder;
+  if (isStamp(st.lastBackupAt)) t.lastBackupAt = st.lastBackupAt;
   return s;
 }
 

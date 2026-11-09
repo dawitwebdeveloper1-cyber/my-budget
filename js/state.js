@@ -1,14 +1,20 @@
 // The app's live data and a single way to change it (with Undo).
-import { load, save, newId } from './store.js';
+import { save, newId, freshState } from './store.js';
 import { toast } from './ui.js';
+import { hasVault, isUnlocked, saveEncrypted } from './vault.js';
 
 export const app = {
-  state: load(),
+  state: freshState(),
   view: { tab: 'home', mode: 'month', anchor: null },
   render: () => {},
 };
 
+// Saves on this device: encrypted once a passcode is set, never in plain form after that.
 export function persist() {
+  if (hasVault()) {
+    if (isUnlocked()) saveEncrypted(app.state).catch(() => toast("Couldn't save on this device"));
+    return;
+  }
   if (!save(app.state)) toast("Couldn't save on this device");
 }
 

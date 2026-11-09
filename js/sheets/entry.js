@@ -5,7 +5,7 @@ import { parseAmount, formatCents, centsToInput } from '../money.js';
 import { nowStamp, isStamp, formatDateTime } from '../dates.js';
 import { signed } from '../calc.js';
 import { parseHours, formatHours, hoursPay, autoSaveSplit, formatPercent } from '../budget.js';
-import { FREQS } from '../recurring.js';
+import { FREQS, alertText } from '../recurring.js';
 import { addEntry, updateEntry, deleteEntry, addRule, editFuture, deleteFuture, PAYCHECK } from '../ops.js';
 import { cleanEntry, cleanRule } from '../store.js';
 import { receiptBody, openReceipt, howButton } from '../components.js';
@@ -208,7 +208,7 @@ export function openEntrySheet(existing = null, preset = {}) {
     // Offer the calendar reminder right away (one tap, then the phone handles it forever).
     sheet.setTitle('Add a reminder?');
     sheet.setContent(
-      h('p', { class: 'dim' }, `Add ${newRule.name} to your calendar. It repeats ${FREQS[newRule.freq].toLowerCase()} and alerts you 1 day and 1 hour before.`),
+      h('p', { class: 'dim' }, `Add ${newRule.name} to your calendar. It repeats ${FREQS[newRule.freq].toLowerCase()} and alerts you ${alertText(s.settings)}.`),
       h('div', { class: 'actions' },
         h('button', { class: 'btn primary', onClick: () => { addToCalendar(newRule); sheet.close(); } }, 'Add to Calendar'),
         h('button', { class: 'btn ghost', onClick: () => sheet.close() }, 'Not now')),

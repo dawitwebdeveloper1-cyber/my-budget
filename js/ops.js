@@ -123,6 +123,42 @@ export function activeRules(state) {
   return state.recurring.filter((r) => nextOccurrence(r) !== null);
 }
 
+// Rename a category everywhere it's used: entries, schedules, limits and this month's moves.
+export function renameCategory(state, kind, from, to) {
+  const name = to.trim();
+  const list = state.categories[kind];
+  if (!name || name === from || !list.includes(from) || list.includes(name)) return false;
+  if (kind === 'income' && from === PAYCHECK) return false;
+  const type = kind === 'income' ? 'income' : 'expense';
+  state.categories[kind] = list.map((c) => (c === from ? name : c));
+  for (const e of state.entries) if (e.type === type && e.category === from) e.category = name;
+  for (const r of state.recurring) if (r.type === type && r.category === from) r.category = name;
+  if (kind === 'expense') {
+    if (from in state.limits) { state.limits[name] = state.limits[from]; delete state.limits[from]; }
+    for (const a of state.adjustments) {
+      if (a.from === from) a.from = name;
+      if (a.to === from) a.to = name;
+    }
+  }
+  return true;
+}
+
+// Remove a category from the list. Past entries keep their category name.
+export function deleteCategory(state, kind, name) {
+  const list = state.categories[kind];
+  if (list.length <= 1 || !list.includes(name) || (kind === 'income' && name === PAYCHECK)) return false;
+  state.categories[kind] = list.filter((c) => c !== name);
+  if (kind === 'expense') delete state.limits[name];
+  return true;
+}
+
+export function addCategory(state, kind, name) {
+  const n = name.trim();
+  if (!n || n.length > 40 || state.categories[kind].includes(n)) return false;
+  state.categories[kind].push(n);
+  return true;
+}
+
 export function deleteGoal(state, goalId) {
   state.goals = state.goals.filter((g) => g.id !== goalId);
   if (state.settings.autoSaveGoalId === goalId) {

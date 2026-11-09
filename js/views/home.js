@@ -6,6 +6,10 @@ import { monthSummary } from '../calc.js';
 import { categoryBudgets, weeklySnapshot, adviceNote } from '../budget.js';
 import { money, howButton, openReceipt, UNVERIFIED, categoryColour } from '../components.js';
 import { openRecap } from './recap.js';
+import { backupDue } from '../backup.js';
+import { hasVault } from '../vault.js';
+import { openPasscodeSetup } from '../lock.js';
+import { openSettings } from '../sheets/settings.js';
 
 export function renderHome(now) {
   const st = app.state;
@@ -31,9 +35,16 @@ export function renderHome(now) {
         sum.net.ok ? h('span', { class: `num ${sum.net.value > 0 ? 'in' : sum.net.value < 0 ? 'out' : ''}` }, formatCents(sum.net.value, { sign: 'always' })) : null),
       sum.left.ok ? howButton(sum.left) : null));
 
-  // One gentle advice note at a time
+  // One gentle line at a time: passcode set-up first, then backup, then spending advice.
   let advice = null;
-  if (st.settings.adviceOn) {
+  const backupDays = backupDue(st.settings, st.entries.length > 0, now);
+  if (!hasVault() && st.entries.length > 0) {
+    advice = h('button', { class: 'advice action fade-in', onClick: () => openPasscodeSetup() },
+      h('span', {}, "Your data isn't locked yet. Set a passcode to encrypt it."), icon('right'));
+  } else if (backupDays !== null) {
+    advice = h('button', { class: 'advice action fade-in', onClick: () => openSettings('backup') },
+      h('span', {}, backupDays === Infinity ? "You haven't made a backup yet. Tap to save one." : `It's been ${backupDays} days since your last backup. Tap to save one.`), icon('right'));
+  } else if (st.settings.adviceOn) {
     const note = adviceNote({
       budgets: categoryBudgets(st, period, now), summary: sum,
       snapshot: weeklySnapshot(st.entries, now, st.settings.weekStartDay),

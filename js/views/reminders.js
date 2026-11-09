@@ -2,7 +2,7 @@ import { h, icon, openSheet } from '../ui.js';
 import { app, change, newId } from '../state.js';
 import { parseAmount, formatCents, centsToInput } from '../money.js';
 import { nowStamp, isStamp, formatDate, formatDateTime } from '../dates.js';
-import { FREQS, KINDS, nextOccurrence, upcoming } from '../recurring.js';
+import { FREQS, KINDS, nextOccurrence, upcoming, alertText } from '../recurring.js';
 import { activeRules, editRule, stopRule } from '../ops.js';
 import { money } from '../components.js';
 import { addToCalendar } from '../calendar.js';
@@ -54,7 +54,7 @@ export function openRuleSheet(rule) {
         h('ul', { class: 'facts' }, dates.map((d) => h('li', {}, formatDateTime(d))))) : null,
       h('div', { class: 'actions' },
         rule.type === 'expense' ? h('button', { class: 'btn primary', onClick: () => addToCalendar(rule) }, 'Add to Calendar') : null,
-        rule.type === 'expense' ? h('p', { class: 'faint small-note center' }, 'Alerts 1 day and 1 hour before, every time.') : null,
+        rule.type === 'expense' ? h('p', { class: 'faint small-note center' }, `Alerts ${alertText(st.settings)}, every time.`) : null,
         h('button', { class: 'btn ghost', onClick: () => { sheet.setTitle('Edit'); sheet.setContent(edit()); } }, 'Edit'),
         h('button', { class: 'btn danger', onClick: confirmStop }, 'Stop repeating')),
     ];

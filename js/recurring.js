@@ -88,6 +88,29 @@ export function generateDue(rules, now, makeId, cap = 1000) {
 
 // ---------- Calendar (.ics) files ----------
 
+export const ALERT_DAY_OPTIONS = [[0, 'None'], [1, '1 day before'], [2, '2 days before'], [3, '3 days before'], [7, '1 week before']];
+export const ALERT_MIN_OPTIONS = [[0, 'None'], [15, '15 min before'], [30, '30 min before'], [60, '1 hour before'], [120, '2 hours before']];
+
+// "1 day and 1 hour before", for messages.
+export function alertText(settings = {}) {
+  const parts = [];
+  const d = ALERT_DAY_OPTIONS.find(([v]) => v === (settings.alertDays ?? 1));
+  const m = ALERT_MIN_OPTIONS.find(([v]) => v === (settings.alertMinutes ?? 60));
+  if (d && d[0]) parts.push(d[1].replace(' before', ''));
+  if (m && m[0]) parts.push(m[1].replace(' before', ''));
+  return parts.length ? `${parts.join(' and ')} before` : 'with no alerts';
+}
+
+// Calendar alert times from Settings → Alerts (default: 1 day and 1 hour before).
+export function alertTriggers(settings = {}) {
+  const days = settings.alertDays ?? 1;
+  const mins = settings.alertMinutes ?? 60;
+  const out = [];
+  if (days > 0) out.push(`-P${days}D`);
+  if (mins > 0) out.push(mins % 60 === 0 ? `-PT${mins / 60}H` : `-PT${mins}M`);
+  return out;
+}
+
 const pad = (n) => String(n).padStart(2, '0');
 
 function icsText(s) {
