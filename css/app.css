@@ -1,29 +1,38 @@
 /* My Budget – colours live here only. Light by default; dark follows the phone's setting. */
 :root {
-  --bg: #F6F1E9;
-  --surface: #FFFCF7;
-  --sheet: #FBF7F1;
-  --accent: #1F5F5B;
-  --accent-soft: rgba(31, 95, 91, 0.12);
+  --bg: #F4F0EA;
+  --surface: #FFFDF9;          /* other cards */
+  --sheet: #F8F4EE;
+  --accent: #3A3631;           /* warm charcoal: main card, + button, active tab */
+  --accent-2: #4F4A44;         /* status pill and progress track on the main card */
+  --accent-soft: rgba(58, 54, 49, 0.08);
   --on-accent: #FFFFFF;
-  --in: #3E8E63;
-  --out: #D9654B;
-  --sage: #DDEBDD;
-  --peach: #FBE3D3;
-  --lav: #E6E3F3;
-  --text: #23282B;
-  --label: #7A7F82;
-  --faint: rgba(35, 40, 43, 0.45);
-  --line: rgba(35, 40, 43, 0.09);
-  --line-strong: rgba(35, 40, 43, 0.2);
-  --field: rgba(35, 40, 43, 0.05);
-  --track: rgba(35, 40, 43, 0.08);
-  --shadow: 0 6px 22px rgba(35, 40, 43, 0.07);
-  --shadow-lift: 0 14px 36px rgba(35, 40, 43, 0.16);
-  --scrim: rgba(28, 32, 35, 0.38);
-  /* ring chart palette */
-  --c1: #1F5F5B; --c2: #3E8E63; --c3: #D9654B; --c4: #8A7FC4; --c5: #E0A458;
-  --c6: #5B9BB0; --c7: #C77D9A; --c8: #9BA65D; --c9: #7A7F82;
+  --on-accent-label: #D9D2C8;
+  --hero-fill: #F4EDE2;        /* progress fill on the main card */
+  --strong: #3A3631;           /* focus rings, links, dots, progress fills on light cards */
+  --in: #3F5139;               /* money in text */
+  --out: #94533A;              /* money out text */
+  --in-bg: #E3EADD;
+  --out-bg: #F3E1D3;
+  --soft: #EFE9E0;             /* quiet inner boxes: advice line, goal rows */
+  --settings-bg: #E8E1D6;
+  --tab-idle: #8A847C;
+  --sage: var(--in-bg);
+  --peach: var(--out-bg);
+  --lav: var(--soft);
+  --text: #23211E;
+  --label: #5E5A55;
+  --faint: rgba(35, 33, 30, 0.45);
+  --line: rgba(35, 33, 30, 0.08);
+  --line-strong: rgba(35, 33, 30, 0.2);
+  --field: rgba(35, 33, 30, 0.05);
+  --track: rgba(35, 33, 30, 0.08);
+  --shadow: 0 6px 22px rgba(58, 54, 49, 0.06);
+  --shadow-lift: 0 14px 36px rgba(58, 54, 49, 0.16);
+  --scrim: rgba(27, 25, 23, 0.36);
+  /* spending category colours: deep, warm, saturated */
+  --c1: #B8401F; --c2: #D4900F; --c3: #4E6B2A; --c4: #7A2E2A; --c5: #8A5A2B;
+  --c6: #A8652A; --c7: #5F6B3A; --c8: #9C3B4A; --c9: #6E5F4E;
 
   --font: ui-rounded, "SF Pro Rounded", "Nunito", "Varela Round", system-ui, -apple-system, "Segoe UI", sans-serif;
   --r-card: 26px;
@@ -37,28 +46,35 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #1C2023;
-    --surface: #252A2E;
-    --sheet: #22272A;
-    --accent: #2E8A83;
-    --accent-soft: rgba(46, 138, 131, 0.2);
-    --in: #6CC28F;
-    --out: #F08A6E;
-    --sage: #243A2E;
-    --peach: #3D2A23;
-    --lav: #2B2940;
+    --bg: #1B1917;
+    --surface: #25221F;
+    --sheet: #221F1C;
+    --accent: #45403A;
+    --accent-2: #5A544D;
+    --accent-soft: rgba(242, 238, 232, 0.08);
+    --on-accent: #FFFFFF;
+    --on-accent-label: #D9D2C8;
+    --hero-fill: #EDE5D8;
+    --strong: #E8E1D6;
+    --in: #AFCBA3;
+    --out: #EBA88B;
+    --in-bg: #29342A;
+    --out-bg: #3D2A23;
+    --soft: #2E2A26;
+    --settings-bg: #2E2A26;
+    --tab-idle: #8A847C;
     --text: #F2EEE8;
-    --label: #9AA0A3;
+    --label: #A8A39B;
     --faint: rgba(242, 238, 232, 0.45);
-    --line: rgba(242, 238, 232, 0.09);
+    --line: rgba(242, 238, 232, 0.08);
     --line-strong: rgba(242, 238, 232, 0.2);
     --field: rgba(242, 238, 232, 0.06);
     --track: rgba(242, 238, 232, 0.1);
     --shadow: 0 6px 22px rgba(0, 0, 0, 0.25);
-    --shadow-lift: 0 14px 36px rgba(0, 0, 0, 0.45);
+    --shadow-lift: 0 14px 36px rgba(0, 0, 0, 0.5);
     --scrim: rgba(0, 0, 0, 0.5);
-    --c1: #2E8A83; --c2: #6CC28F; --c3: #F08A6E; --c4: #A99FE0; --c5: #F0BE72;
-    --c6: #7DB8CC; --c7: #E29AB5; --c8: #B7C27A; --c9: #9AA0A3;
+    --c1: #D45A35; --c2: #E5A42B; --c3: #7A9A4E; --c4: #A9483F; --c5: #B07A45;
+    --c6: #D1823F; --c7: #8E9A5A; --c8: #C25A68; --c9: #9C8B76;
     color-scheme: dark;
   }
 }
@@ -469,7 +485,82 @@ input[type="date"].input, input[type="time"].input { min-height: 52px; }
 .switch input:focus-visible + .track { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 .totals-mini.pair-gap { margin-bottom: 14px; }
-.goal-big { color: var(--accent); }
+.goal-big, .goal-amts .num, .progress-head .pct { color: var(--text); }
+
+/* ---------- Warm charcoal version ---------- */
+.shell { padding-bottom: calc(var(--tabbar-h) + var(--safe-bottom) + 120px); }
+.topbar { margin-bottom: 22px; }
+.topbar .eyebrow { color: var(--label); font-size: 13.5px; }
+.topbar .round-btn { background: var(--settings-bg); box-shadow: none; }
+.card { margin-bottom: 16px; padding: 22px; }
+.tab { color: var(--tab-idle); }
+.tab[aria-current="page"] { color: var(--text); background: var(--soft); }
+.fab { box-shadow: 0 10px 26px rgba(27, 25, 23, 0.28); }
+@media (prefers-color-scheme: dark) { .fab { border: 1px solid var(--line-strong); } }
+button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus-visible { outline-color: var(--strong); }
+.input:focus { border-color: var(--strong); }
+.link, .add-line { color: var(--text); }
+.dots i.on { background: var(--strong); border-color: var(--strong); }
+.check input { accent-color: var(--accent); }
+
+/* Other cards are plain warm white: no tints except money in / money out */
+.card.sage, .card.peach, .card.lav { background: var(--surface); box-shadow: var(--shadow); }
+.goal, .budget, .card.sage .goal, .card.peach .budget, .card.lav .goal { background: var(--soft); }
+.free-list, .add-line { background: var(--soft); }
+.badge { background: var(--settings-bg); color: var(--text); }
+.bar i, .bar i.gold { background: var(--strong); }
+.bar i.over { background: var(--out); }
+.advice, .recap-link { background: var(--soft); }
+.set-section, .set-section:nth-of-type(1), .set-section:nth-of-type(2), .set-section:nth-of-type(3) { background: var(--surface); box-shadow: var(--shadow); }
+.set-body .rows, .set-body .btn.ghost { background: var(--soft); }
+.chip[aria-pressed="true"], .switch input:checked + .track { background: var(--accent); }
+@media (prefers-color-scheme: dark) { .chip[aria-pressed="true"], .switch input:checked + .track { background: #6A635B; } }
+.empty .em-ic { background: var(--soft); color: var(--label); }
+.snapshot .totals-mini .row, .snapshot .totals-mini .row:first-child, .snapshot .totals-mini .row:last-child { background: var(--soft); }
+.totals-mini .row:first-child { background: var(--in-bg); }
+.totals-mini .row:last-child { background: var(--out-bg); }
+
+/* Main card: big number, status pill, budget progress inside */
+.hero { background: var(--accent); color: var(--on-accent); box-shadow: 0 14px 34px rgba(27, 25, 23, 0.22); padding: 26px 22px 22px; }
+.hero .label { color: var(--on-accent-label); opacity: 1; }
+.hero .big { margin: 8px 0 14px; }
+.hero .pill { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 999px; background: var(--accent-2); font-size: 14.5px; font-weight: 700; }
+.hero .pill .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--hero-fill); }
+.hero .hero-bar { height: 10px; border-radius: 999px; background: var(--accent-2); overflow: hidden; margin: 20px 0 8px; }
+.hero .hero-bar i { display: block; height: 100%; border-radius: 999px; background: var(--hero-fill); }
+.hero .hero-bar.fill i { transition: width .9s var(--ease); }
+.hero .hero-bar i.over { background: #EBA88B; }
+.hero .used { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: 100%; font-size: 14.5px; color: var(--on-accent-label); text-align: left; }
+.hero .used > span:last-child { font-size: 13px; }
+.hero .used b { color: var(--on-accent); font-weight: 800; }
+.hero .net { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 14px; padding-top: 14px; border-top: 1px solid rgba(255, 255, 255, 0.12); font-size: 14px; color: var(--on-accent-label); flex-wrap: wrap; }
+.hero .net b { color: var(--on-accent); font-weight: 700; }
+.hero .how { color: var(--on-accent-label); opacity: 1; }
+
+/* Money in / money out cards */
+.pair { gap: 14px; margin-bottom: 16px; }
+.pair-card { padding: 18px; }
+.pair-card.tint-sage { background: var(--in-bg); color: var(--in); }
+.pair-card.tint-peach { background: var(--out-bg); color: var(--out); }
+.pair-card .k { color: inherit; opacity: .85; }
+.pair-card .v, .pair-card .v.in, .pair-card .v.out { color: inherit; }
+.pair-card .ic { background: rgba(255, 255, 255, 0.6); color: inherit; }
+@media (prefers-color-scheme: dark) { .pair-card .ic { background: rgba(255, 255, 255, 0.08); } }
+
+/* Ring chart with the category list beside it */
+.ring-row { display: grid; grid-template-columns: 128px 1fr; gap: 16px; align-items: center; }
+.ring-row .ring { width: 128px; height: 128px; margin: 0; }
+.ring-row .ring .center small { font-size: 11px; }
+.ring-row .ring .center b { font-size: 15px; }
+.cat-list { display: flex; flex-direction: column; min-width: 0; }
+.cat-item { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; align-items: center; padding: 8px 0; border-top: 1px solid var(--line); text-align: left; width: 100%; font-size: 14.5px; }
+.cat-item:first-child { border-top: 0; }
+.cat-item .n { font-weight: 600; overflow-wrap: anywhere; line-height: 1.25; }
+.cat-item .v { font-weight: 800; }
+.cat-item.pre { opacity: 0; transform: translateY(6px); }
+.cat-item.go { opacity: 1; transform: none; transition: opacity .35s var(--ease), transform .35s var(--ease); }
+.ring-how { margin-top: 12px; }
+@media (max-width: 345px) { .ring-row { grid-template-columns: 1fr; justify-items: center; } .cat-list { width: 100%; } }
 
 /* ---------- Confetti ---------- */
 .confetti { position: fixed; inset: 0; pointer-events: none; z-index: 150; overflow: hidden; }
@@ -479,6 +570,6 @@ input[type="date"].input, input[type="time"].input { min-height: 52px; }
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   *, *::before, *::after { animation: none !important; transition: none !important; }
-  .reveal, .cat-card.pre { opacity: 1 !important; transform: none !important; }
+  .reveal, .cat-card.pre, .cat-item.pre { opacity: 1 !important; transform: none !important; }
   .confetti { display: none; }
 }

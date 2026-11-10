@@ -1,4 +1,4 @@
-// Draws the app icon (teal ring with a small coral segment on warm cream) as PNG files.
+// Draws the app icon (warm charcoal ring with a burnt orange segment on warm cream) as PNG files.
 import { deflateSync, crc32 } from 'node:zlib';
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -7,10 +7,10 @@ const out = resolve(import.meta.dirname, '..', 'icons');
 mkdirSync(out, { recursive: true });
 
 const hex = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
-const BG = hex('#F6F1E9');
-const BG2 = hex('#FBF7F1');
-const GOLD = hex('#1F5F5B'); // ring: deep teal
-const CORAL = hex('#D9654B');
+const BG = hex('#F4F0EA');
+const BG2 = hex('#FFFDF9');
+const GOLD = hex('#3A3631'); // ring: warm charcoal
+const CORAL = hex('#B8401F'); // burnt orange
 
 function draw(size) {
   const ss = 4; // supersampling for smooth edges

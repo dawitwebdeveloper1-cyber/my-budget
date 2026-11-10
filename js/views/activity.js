@@ -48,7 +48,7 @@ export function renderActivity(now, animate = false) {
     diffText = d > 0 ? `${formatCents(d)} more than last week`
       : d < 0 ? `${formatCents(-d)} less than last week` : 'Same as last week';
   }
-  const snapshot = h('section', { class: `card lav${rv}` },
+  const snapshot = h('section', { class: `card snapshot${rv}` },
     h('h2', {}, 'Weekly snapshot'),
     h('div', { class: 'totals-mini' },
       mini('This week so far', snap.thisOut, 'out'),

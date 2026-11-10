@@ -4,7 +4,7 @@ import { formatCents } from '../money.js';
 import { budgetMonth, shiftBudgetMonth, parseStamp } from '../dates.js';
 import { monthSummary } from '../calc.js';
 import { categoryBudgets, weeklySnapshot, adviceNote, budgetProgress, casualStatus } from '../budget.js';
-import { money, howButton, openReceipt, UNVERIFIED, categoryColour, bar, tint, emptyState } from '../components.js';
+import { money, howButton, openReceipt, UNVERIFIED, emptyState } from '../components.js';
 import { countUp, reducedMotion, EASE } from '../motion.js';
 import { openRecap } from './recap.js';
 import { backupDue } from '../backup.js';
@@ -39,12 +39,12 @@ export function renderHome(now, animate = false) {
   const hero = h('section', { class: `card hero${rv}` },
     h('div', { class: 'label' }, "What's left"),
     sum.left.ok ? big : h('p', { class: 'unverified' }, UNVERIFIED),
-    casual ? h('p', { class: 'casual' }, casual) : null,
-    h('div', { class: 'hero-foot' },
-      h('button', { class: `status ${sum.status}`, onClick: (e) => sum.net.ok && openReceipt(sum.net, e.currentTarget) },
-        h('span', { class: 'dot' }),
-        h('span', {}, statusText),
-        sum.net.ok ? h('span', { class: 'num' }, formatCents(sum.net.value, { sign: 'always' })) : null),
+    casual ? h('div', {}, h('span', { class: 'pill' }, h('span', { class: 'dot' }), casual)) : null,
+    heroProgress(progress, motion),
+    // Ahead / behind this month, with its own "show me how"
+    h('div', { class: 'net' },
+      h('button', { class: 'press', onClick: (e) => sum.net.ok && openReceipt(sum.net, e.currentTarget.closest('.card')) },
+        `${statusText} `, sum.net.ok ? h('b', { class: 'num' }, formatCents(sum.net.value, { sign: 'always' })) : null),
       sum.left.ok ? howButton(sum.left) : null));
 
   // ---- One gentle line at a time: passcode set-up first, then backup, then spending advice.
@@ -93,7 +93,31 @@ export function renderHome(now, animate = false) {
       row(`Carried over from ${sum.previousLabel}`, sum.carry, sum.carry.value < 0 ? 'out' : 'in'),
       sum.saved.ok && sum.saved.value !== 0 ? row('Moved to savings', sum.saved, 'save') : null));
 
-  return [hero, advice, recapLink, pair, extra, renderProgress(progress, motion, rv), renderRing(sum, motion, rv)];
+  return [hero, advice, recapLink, pair, extra, renderRing(sum, motion, rv)];
+}
+
+// Budget progress inside the main card: "53% of this month's budget used"
+function heroProgress(p, motion) {
+  if (!p.ok) {
+    return p.empty ? null : h('p', { class: 'used' }, UNVERIFIED);
+  }
+  const width = `${Math.min(100, p.value)}%`;
+  const fill = h('i', { class: p.value > 100 ? 'over' : '' });
+  const barEl = h('div', { class: `hero-bar${motion ? ' fill' : ''}`, role: 'progressbar', 'aria-valuenow': String(Math.min(100, p.value)), 'aria-valuemin': '0', 'aria-valuemax': '100', 'aria-label': 'Budget used' }, fill);
+  if (motion) {
+    fill.style.width = '0%';
+    setTimeout(() => requestAnimationFrame(() => { fill.style.width = width; }), 160);
+  } else {
+    fill.style.width = width;
+  }
+  const pct = h('b', { class: 'num' });
+  if (motion) countUp(pct, p.value, (v) => `${v}%`, { duration: 900, delay: 160 });
+  else pct.textContent = `${p.value}%`;
+  return h('div', {},
+    barEl,
+    h('button', { class: 'used press', onClick: (e) => openReceipt(p, e.currentTarget.closest('.card')) },
+      h('span', {}, pct, p.basis === 'budget' ? " of this month's budget used" : " of this month's money used"),
+      h('span', { class: 'num' }, `${formatCents(p.spent)} of ${formatCents(p.base)}`)));
 }
 
 function daysSince(startStamp, now) {
@@ -102,30 +126,10 @@ function daysSince(startStamp, now) {
   return Math.floor((Date.UTC(b.y, b.m - 1, b.d) - Date.UTC(a.y, a.m - 1, a.d)) / 86400000);
 }
 
-// ---- Progress: how much of this month's budget has been spent
-function renderProgress(p, motion, rv) {
-  const card = h('section', { class: `card${rv}` }, h('h2', {}, "This month's budget"));
-  if (!p.ok) {
-    card.append(p.empty
-      ? emptyState('leaf', null, 'Add money in, or set category limits in Goals, to see how much of your budget is spent.')
-      : h('p', { class: 'unverified' }, UNVERIFIED));
-    return card;
-  }
-  const pct = h('span', { class: 'pct num' });
-  if (motion) countUp(pct, p.value, (v) => `${v}%`, { duration: 900, delay: 150 });
-  else pct.textContent = `${p.value}%`;
-  card.append(
-    h('div', { class: 'progress-head' },
-      h('span', { class: 'progress-sub' }, p.basis === 'budget' ? 'spent of your budget' : 'spent of the money you had'),
-      pct),
-    bar(p.value, { over: p.value > 100, fill: motion, delay: 110 }),
-    h('div', { class: 'progress-head' },
-      h('span', { class: 'progress-sub num' }, `${formatCents(p.spent)} of ${formatCents(p.base)}`),
-      howButton(p)));
-  return card;
-}
+// Slices take the category colours in order: burnt orange, amber, deep olive, oxblood, then similar warm tones.
+const sliceColour = (i) => `var(--c${(i % 9) + 1})`;
 
-// ---- Spending ring: rounded slices with small gaps, total in the middle
+// ---- Spending ring: slices with small gaps, total in the middle
 function renderRing(sum, motion, rv) {
   const card = h('section', { class: `card${rv}` }, h('h2', {}, 'Spending by category'));
   if (!sum.categoriesOk || !sum.moneyOut.ok) { card.append(h('p', { class: 'unverified' }, UNVERIFIED)); return card; }
@@ -134,8 +138,8 @@ function renderRing(sum, motion, rv) {
   if (!cats.length) { card.append(emptyState('sparkle', 'No spending yet', 'Your spending this month will show up here, by category.')); return card; }
 
   const CX = 100;
-  const R = 78;
-  const W = 20;
+  const R = 80;
+  const W = 22;
   const C = 2 * Math.PI * R;
   const single = cats.length === 1;
   const gap = single ? 0 : 7;
@@ -150,7 +154,7 @@ function renderRing(sum, motion, rv) {
       cx: CX, cy: CX, r: R, fill: 'none', 'stroke-width': W, 'stroke-linecap': single ? 'butt' : 'round',
       'stroke-dasharray': `${dash} ${C}`, transform: `rotate(${-90 + (startAt / C) * 360} ${CX} ${CX})`,
     });
-    seg.style.stroke = categoryColour(c.category); // CSS variable, so it follows dark mode
+    seg.style.stroke = sliceColour(i); // CSS variable, so it follows dark mode
     if (motion) {
       seg.animate([
         { strokeDasharray: `0.001 ${C}`, opacity: 0 },
@@ -170,17 +174,16 @@ function renderRing(sum, motion, rv) {
     h('div', { class: 'center' }, h('div', {}, h('small', {}, 'Spent'), totalEl)));
   ring.querySelector('circle').style.stroke = 'var(--track)';
 
-  // Small tinted cards under the ring, appearing in step with their slices.
-  const grid = h('div', { class: 'cat-grid' }, cats.map((c, i) => {
+  // Category list beside the ring, each line fading in alongside its slice.
+  const list = h('div', { class: 'cat-list' }, cats.map((c, i) => {
     const dot = h('i', { class: 'swatch' });
-    dot.style.background = categoryColour(c.category);
-    const el = h('button', { class: `cat-card tint-${tint(i)}${motion ? ' pre' : ''}`, onClick: (e) => openReceipt(c, e.currentTarget) },
-      h('span', { class: 'top' }, dot, h('span', {}, c.category)),
-      h('span', { class: 'v num' }, formatCents(c.value)));
+    dot.style.background = sliceColour(i);
+    const el = h('button', { class: `cat-item press${motion ? ' pre' : ''}`, onClick: () => openReceipt(c, card) },
+      dot, h('span', { class: 'n' }, c.category), h('span', { class: 'v num' }, formatCents(c.value)));
     if (motion) setTimeout(() => el.classList.add('go'), i * step + 80);
     return el;
   }));
 
-  card.append(ring, grid, h('div', {}, howButton(sum.moneyOut, 'Show me how (all spending)')));
+  card.append(h('div', { class: 'ring-row' }, ring, list), h('div', { class: 'ring-how' }, howButton(sum.moneyOut, 'Show me how (all spending)')));
   return card;
 }
