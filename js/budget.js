@@ -213,6 +213,68 @@ export function weeklySnapshot(entries, now, weekStart = 1) {
   };
 }
 
+// ---------- This month's budget progress (Home progress bar) ----------
+// With category limits: spending in those categories ÷ the total of the limits.
+// Without limits: all spending ÷ the money you've had this month (carried over + in − saved).
+// The percentage rounds DOWN, so it never says 100% before you actually get there.
+export function budgetProgress(state, period, now, summary) {
+  const b = categoryBudgets(state, period, now);
+  const limited = b.rows.filter((r) => r.limit !== null);
+  let spentA, spentB, base, basis, spentReceipt, baseReceipt;
+  if (limited.length) {
+    if (!b.total.ok || !limited.every((r) => r.spent.ok)) return { ok: false };
+    basis = 'budget';
+    base = b.total.limit;
+    spentA = b.total.limit - b.total.value;
+    spentB = sumCents(limited.map((r) => r.spent.value));
+    const names = new Set(limited.map((r) => r.category));
+    const items = state.entries.filter((e) => e.type === 'expense' && names.has(e.category) && e.at <= now && e.at >= period.start && e.at < period.end)
+      .sort((a, b2) => (a.at < b2.at ? -1 : 1));
+    spentReceipt = { title: 'Spent in categories with limits', totalLabel: 'Spent so far', lines: items.map((e) => ({ label: e.name, at: e.at, category: e.category, type: 'expense', cents: e.cents, neutral: true })) };
+    baseReceipt = { title: 'Your budget', totalLabel: 'Total budget', lines: limited.map((r) => ({ label: `${r.category} limit`, cents: r.limit, neutral: true })) };
+  } else {
+    if (!summary.left.ok || !summary.moneyOut.ok || !summary.moneyIn.ok || !summary.saved.ok || !summary.carry.ok) return { ok: false };
+    basis = 'money';
+    base = summary.carry.value + summary.moneyIn.value + summary.saved.value;
+    spentA = -summary.moneyOut.value;
+    spentB = 0;
+    for (const e of state.entries) if (e.type === 'expense' && e.at <= now && e.at >= period.start && e.at < period.end) spentB += e.cents;
+    spentReceipt = { title: 'Spent this month', totalLabel: 'Spent so far', lines: (summary.moneyOut.receipt?.lines ?? []).map((l) => ({ ...l, cents: -l.cents, neutral: true })) };
+    baseReceipt = { title: 'Money you had this month', totalLabel: 'Money you had', lines: [
+      ...(summary.carry.value ? [{ label: `Carried over from ${summary.previousLabel}`, cents: summary.carry.value, neutral: true }] : []),
+      ...(summary.moneyIn.receipt?.lines ?? []).map((l) => ({ ...l, neutral: true })),
+      ...(summary.saved.receipt?.lines ?? []).map((l) => ({ ...l, neutral: true })),
+    ] };
+  }
+  const spent = checked(spentA, spentB);
+  if (!spent.ok || base <= 0) return { ok: false, empty: base <= 0, basis };
+  if (!receiptMatches(spentReceipt, spent.value) || !receiptMatches(baseReceipt, base)) return { ok: false, basis };
+  const pA = Math.floor((spent.value * 100) / base);
+  const pB = Number((BigInt(spent.value) * 100n) / BigInt(base));
+  const pct = checked(pA, pB);
+  if (!pct.ok) return { ok: false, basis };
+  const exact = Number((BigInt(spent.value) * 10000n) / BigInt(base)); // hundredths of a percent
+  return {
+    ok: true, basis, value: pct.value, spent: spent.value, base,
+    receipt: { kind: 'ratio', title: basis === 'budget' ? "This month's budget" : 'Spent this month', spent: spent.value, base, exact, percent: pct.value, spentReceipt, baseReceipt, spentLabel: 'Spent so far', baseLabel: basis === 'budget' ? 'Your budget' : 'Money you had' },
+  };
+}
+
+// ---------- A short, casual status line for Home ----------
+export function casualStatus({ summary, snapshot, progress, period, now }) {
+  if (!summary.left.ok) return null;
+  if (summary.left.value < 0) return 'Slow down a bit';
+  const total = daysBetween(period.start, period.end) || 1;
+  const elapsed = Math.min(total, daysBetween(period.start, now.slice(0, 10) + 'T00:00') + 1);
+  if (progress?.ok && progress.value > Math.floor((elapsed * 100) / total) + 10) return 'Slow down a bit';
+  if (snapshot.thisOut.ok && snapshot.thisOut.value === 0) return 'Quiet week so far';
+  if (snapshot.diff.ok && snapshot.lastOut.ok) {
+    const last = -snapshot.lastOut.value;
+    if (snapshot.diff.value >= 2000 && last > 0 && snapshot.diff.value * 4 > last) return 'Spending is up this week. Slow down a bit';
+  }
+  return "You're good this week";
+}
+
 // ---------- Advice notes (gentle, one at a time) ----------
 function daysBetween(a, b) {
   const pa = parseStamp(a);

@@ -39,9 +39,9 @@ const line = (label, control, note) => h('div', { class: 'set-line' },
 
 const saved = (msg = 'Saved') => toast(msg);
 
-export function openSettings(openSection = null) {
+export function openSettings(openSection = null, from = null) {
   const opened = new Set(openSection ? [openSection] : []);
-  const sheet = openSheet('Settings', () => body());
+  const sheet = openSheet('Settings', () => body(), { from });
 
   function redraw() { sheet.setContent(body()); }
 

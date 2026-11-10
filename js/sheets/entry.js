@@ -18,8 +18,9 @@ function chipGroup(label, options, value, onPick) {
     h('button', { class: 'chip', 'aria-pressed': String(value === v), onClick: () => onPick(v) }, text)));
 }
 
-export function openEntrySheet(existing = null, preset = {}) {
-  if (existing?.type === 'saving') { openSavingSheet(existing); return; }
+// opts.from: the tapped row (expands into the form). opts.action 'delete': go straight to the delete confirmation.
+export function openEntrySheet(existing = null, preset = {}, { from = null, action = null } = {}) {
+  if (existing?.type === 'saving') { openSavingSheet(existing, { from, action }); return; }
   const s = app.state;
   const now = nowStamp();
   const rule = existing?.recurringId ? s.recurring.find((r) => r.id === existing.recurringId) : null;
@@ -40,7 +41,7 @@ export function openEntrySheet(existing = null, preset = {}) {
   let errors = {};
   const title = existing ? 'Edit entry' : 'New entry';
   const isPay = () => d.type === 'income' && d.category === PAYCHECK;
-  const sheet = openSheet(title, () => form());
+  const sheet = openSheet(title, () => form(), { from });
 
   function setRepeats(v) {
     d.repeats = v;
@@ -107,6 +108,7 @@ export function openEntrySheet(existing = null, preset = {}) {
   }
 
   function redraw() { sheet.setTitle(title); sheet.setContent(form()); }
+  if (existing && action === 'delete') confirmDelete();
 
   function build() {
     errors = {};
@@ -233,10 +235,20 @@ export function openEntrySheet(existing = null, preset = {}) {
 }
 
 // Money moved to a savings goal.
-function openSavingSheet(entry) {
+function openSavingSheet(entry, { from = null, action = null } = {}) {
   const s = app.state;
   const parent = entry.parentId ? s.entries.find((e) => e.id === entry.parentId) : null;
   const goal = s.goals.find((g) => g.id === entry.goalId);
+  const card = () => h('div', { class: 'confirm-card' },
+    h('div', { class: 'big num dim' }, icon('down', 'arrow'), formatCents(-entry.cents)),
+    h('div', { class: 'what' }, goal ? `To ${goal.name}` : entry.name),
+    h('div', { class: 'meta' }, formatDateTime(entry.at)));
+  const confirmDelete = () => {
+    sheet.setTitle('Delete this entry?');
+    sheet.setContent(card(), h('div', { class: 'actions' },
+      h('button', { class: 'btn primary', onClick: () => { change((st) => deleteEntry(st, entry.id), 'Deleted'); sheet.close(); } }, 'Delete'),
+      h('button', { class: 'btn ghost', onClick: () => sheet.close() }, 'Keep it')));
+  };
   const sheet = openSheet('Moved to savings', () => [
     h('div', { class: 'confirm-card' },
       h('div', { class: 'big num dim' }, icon('down', 'arrow'), formatCents(-entry.cents)),
@@ -248,8 +260,9 @@ function openSavingSheet(entry) {
         h('p', { class: 'faint small-note center' }, 'This came from your paycheck automatically. To change it, edit the paycheck.'),
         h('button', { class: 'btn ghost', onClick: () => { sheet.close(); openEntrySheet(parent); } }, 'Open the paycheck'))
       : h('div', { class: 'actions' },
-        h('button', { class: 'btn danger', onClick: () => { change((st) => deleteEntry(st, entry.id), 'Deleted'); sheet.close(); } }, 'Delete')),
-  ]);
+        h('button', { class: 'btn danger', onClick: confirmDelete }, 'Delete')),
+  ], { from });
+  if (action === 'delete' && !parent) confirmDelete();
 }
 
 export { openReceipt };

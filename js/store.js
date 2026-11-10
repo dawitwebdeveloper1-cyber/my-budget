@@ -36,6 +36,7 @@ export function freshState() {
     limits: {},
     adjustments: [],
     notice: [],           // entry ids added automatically since the last visit
+    celebrated: [],       // goals that have had their confetti
     dismissedAdvice: [],
     categories: structuredClone(DEFAULT_CATEGORIES),
     settings: { ...DEFAULT_SETTINGS },
@@ -129,6 +130,8 @@ export function cleanState(raw) {
       .filter((a) => a && isStamp(a.month) && cents(a.cents) && typeof a.from === 'string' && typeof a.to === 'string' && a.from !== a.to)
       .map((a) => ({ id: str(a.id, 64) || newId(), month: a.month, from: str(a.from, 40), to: str(a.to, 40), cents: a.cents }));
   }
+  // Older saved data has no list yet: null means "note reached goals quietly, no confetti".
+  s.celebrated = Array.isArray(raw.celebrated) ? raw.celebrated.filter((x) => typeof x === 'string').slice(0, 500) : null;
   if (Array.isArray(raw.notice)) s.notice = raw.notice.filter((x) => typeof x === 'string').slice(0, 500);
   if (Array.isArray(raw.dismissedAdvice)) s.dismissedAdvice = raw.dismissedAdvice.filter((x) => typeof x === 'string').slice(-200);
 

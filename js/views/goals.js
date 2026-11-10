@@ -5,40 +5,43 @@ import { budgetMonth, nowStamp, formatDateTime } from '../dates.js';
 import { goalProgress, categoryBudgets, coverOptions, parsePercent, formatPercent } from '../budget.js';
 import { addEntry, deleteGoal } from '../ops.js';
 import { cleanGoal } from '../store.js';
-import { money, howButton, bar, receiptBody, UNVERIFIED } from '../components.js';
+import { money, howButton, bar, receiptBody, UNVERIFIED, emptyState } from '../components.js';
+import { reducedMotion } from '../motion.js';
 
-export function renderGoals(now) {
+export function renderGoals(now, animate = false) {
   const st = app.state;
   const period = budgetMonth(now, st.settings.monthStartDay);
+  const rv = animate ? ' reveal' : '';
+  const fill = animate && !reducedMotion();
 
   // ---- Savings goals
   const goalRows = st.goals.map((g) => {
     const p = goalProgress(g, st.entries, now);
     const auto = st.settings.autoSaveGoalId === g.id && st.settings.autoSaveBp > 0;
-    return h('button', { class: 'goal', onClick: () => openGoalSheet(g) },
+    return h('button', { class: 'goal', onClick: (e) => openGoalSheet(g, e.currentTarget) },
       h('div', { class: 'goal-top' },
         h('span', { class: 'goal-name' }, g.name),
-        auto ? h('span', { class: 'badge' }, `Auto-save ${formatPercent(st.settings.autoSaveBp)}`) : null),
+        p.reached ? h('span', { class: 'badge' }, 'Reached') : auto ? h('span', { class: 'badge' }, `Auto-save ${formatPercent(st.settings.autoSaveBp)}`) : null),
       p.ok
-        ? [h('div', { class: 'goal-amts' }, h('span', { class: 'num in' }, formatCents(p.value)), h('span', { class: 'faint' }, ` of ${formatCents(g.targetCents)}`)),
-          bar(p.percent, { gold: true }),
+        ? [h('div', { class: 'goal-amts' }, h('span', { class: 'num' }, formatCents(p.value)), h('span', { class: 'faint' }, ` of ${formatCents(g.targetCents)}`)),
+          bar(p.percent, { gold: true, fill }),
           h('div', { class: 'goal-foot faint' }, p.reached ? 'Goal reached' : `${p.percent}% · ${formatCents(p.toGo)} to go`)]
         : h('p', { class: 'unverified' }, UNVERIFIED));
   });
-  const goals = h('section', { class: 'card fade-in' },
+  const goals = h('section', { class: `card sage${rv}` },
     h('h2', {}, 'Savings goals'),
-    goalRows.length ? h('div', { class: 'goal-list' }, goalRows) : h('p', { class: 'empty' }, 'No goals yet. Add one, like "New shoes – $150".'),
+    goalRows.length ? h('div', { class: 'goal-list' }, goalRows) : emptyState('goal', 'No goals yet', 'Add one, like "New shoes – $150", and watch it fill up.'),
     h('button', { class: 'add-line', onClick: () => openGoalSheet(null) }, icon('plus'), 'New goal'));
 
   // ---- Category budgets
   const b = categoryBudgets(st, period, now);
   const limited = b.rows.filter((r) => r.limit !== null);
   const free = b.rows.filter((r) => r.limit === null);
-  const budgetRows = limited.map((r) => h('button', { class: 'budget', onClick: () => openBudgetSheet(r.category) },
+  const budgetRows = limited.map((r) => h('button', { class: 'budget', onClick: (e) => openBudgetSheet(r.category, e.currentTarget) },
     h('div', { class: 'goal-top' },
       h('span', {}, r.category),
       r.ok ? (r.over > 0 ? h('span', { class: 'num out' }, `Over by ${formatCents(r.over)}`) : h('span', { class: 'num' }, `${formatCents(r.value)} left`)) : h('span', { class: 'unverified' }, 'Hidden')),
-    r.ok ? bar(r.percent, { over: r.over > 0 }) : null,
+    r.ok ? bar(r.percent, { over: r.over > 0, fill }) : null,
     r.ok ? h('div', { class: 'goal-foot faint' }, `${formatCents(r.spent.value)} of ${formatCents(r.effective)}${r.effective !== r.limit ? ' (this month)' : ''}`) : null));
 
   const total = limited.length && b.total.ok
@@ -49,11 +52,11 @@ export function renderGoals(now) {
       howButton(b.total))
     : null;
 
-  const budgets = h('section', { class: 'card fade-in' },
+  const budgets = h('section', { class: `card peach${rv}` },
     h('h2', {}, 'Category budgets'),
     total,
-    limited.length ? h('div', { class: 'goal-list' }, budgetRows) : h('p', { class: 'empty' }, 'No limits set yet. Tap a category below to give it a monthly limit.'),
-    free.length ? h('div', { class: 'free-list' }, free.map((r) => h('button', { class: 'row', onClick: () => openBudgetSheet(r.category) },
+    limited.length ? h('div', { class: 'goal-list' }, budgetRows) : emptyState('leaf', 'No limits yet', 'Tap a category below to give it a monthly limit.'),
+    free.length ? h('div', { class: 'free-list' }, free.map((r) => h('button', { class: 'row', onClick: (e) => openBudgetSheet(r.category, e.currentTarget) },
       h('span', { class: 'name' }, h('span', {}, r.category)),
       h('span', { class: 'faint small' }, r.spent.ok && r.spent.value ? `${formatCents(r.spent.value)} spent · Set a limit` : 'Set a limit')))) : null);
 
@@ -61,11 +64,11 @@ export function renderGoals(now) {
 }
 
 // ---------- Goal sheet ----------
-function openGoalSheet(goal) {
+function openGoalSheet(goal, from = null) {
   const st = app.state;
   const d = { name: goal?.name ?? '', target: goal ? centsToInput(goal.targetCents) : '', add: '', pct: '' };
   let errors = {};
-  const sheet = openSheet(goal ? goal.name : 'New goal', () => view());
+  const sheet = openSheet(goal ? goal.name : 'New goal', () => view(), { from });
 
   function view() {
     if (!goal) return editForm();
@@ -73,7 +76,7 @@ function openGoalSheet(goal) {
     const isAuto = st.settings.autoSaveGoalId === goal.id && st.settings.autoSaveBp > 0;
     return [
       p.ok ? h('div', { class: 'confirm-card' },
-        h('div', { class: 'big num in' }, formatCents(p.value)),
+        h('div', { class: 'big num goal-big' }, formatCents(p.value)),
         h('div', { class: 'meta' }, `saved of ${formatCents(goal.targetCents)}`),
         bar(p.percent, { gold: true }),
         h('div', { class: 'meta' }, p.reached ? 'Goal reached' : `${formatCents(p.toGo)} to go`),
@@ -166,14 +169,14 @@ function openGoalSheet(goal) {
 }
 
 // ---------- Category budget sheet ----------
-function openBudgetSheet(category) {
+function openBudgetSheet(category, from = null) {
   const st = app.state;
   const now = nowStamp();
   const period = budgetMonth(now, st.settings.monthStartDay);
   const current = st.limits[category];
   const d = { limit: Number.isSafeInteger(current) ? centsToInput(current) : '' };
   let error = null;
-  const sheet = openSheet(category, () => view());
+  const sheet = openSheet(category, () => view(), { from });
 
   function view() {
     const b = categoryBudgets(app.state, period, now);

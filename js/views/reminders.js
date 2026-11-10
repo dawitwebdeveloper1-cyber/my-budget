@@ -4,19 +4,20 @@ import { parseAmount, formatCents, centsToInput } from '../money.js';
 import { nowStamp, isStamp, formatDate, formatDateTime } from '../dates.js';
 import { FREQS, KINDS, nextOccurrence, upcoming, alertText } from '../recurring.js';
 import { activeRules, editRule, stopRule } from '../ops.js';
-import { money } from '../components.js';
+import { money, emptyState } from '../components.js';
 import { addToCalendar } from '../calendar.js';
 import { openEntrySheet } from '../sheets/entry.js';
 
 const pad = (n) => String(n).padStart(2, '0');
 
-export function renderReminders() {
+export function renderReminders(now, animate = false) {
   const st = app.state;
+  const rv = animate ? ' reveal' : '';
   const rules = activeRules(st).map((r) => ({ r, next: nextOccurrence(r) })).sort((a, b) => (a.next < b.next ? -1 : 1));
   const bills = rules.filter((x) => x.r.type === 'expense');
   const pays = rules.filter((x) => x.r.type === 'income');
 
-  const row = ({ r, next }) => h('button', { class: 'entry', onClick: () => openRuleSheet(r) },
+  const row = ({ r, next }) => h('button', { class: 'entry', onClick: (e) => openRuleSheet(r, e.currentTarget) },
     h('div', {},
       h('div', {}, r.name),
       h('div', { class: 'meta' }, `${KINDS[r.kind]} · ${FREQS[r.freq]} · next ${formatDate(next, { weekday: true })}`)),
@@ -28,19 +29,19 @@ export function renderReminders() {
   });
 
   return [
-    h('section', { class: 'card fade-in' },
+    h('section', { class: `card lav${rv}` },
       h('h2', {}, 'Bills & subscriptions'),
-      bills.length ? h('div', { class: 'list-in' }, bills.map(row)) : h('p', { class: 'empty' }, 'Nothing repeating yet. Add rent, phone, Netflix and so on, and they\'ll be added automatically each time.'),
+      bills.length ? h('div', { class: 'list-in' }, bills.map(row)) : emptyState('calendar', 'Nothing repeating yet', "Add rent, phone, Netflix and so on, and they'll be added automatically each time."),
       h('button', { class: 'add-line', onClick: addBill }, icon('plus'), 'Add a bill or subscription')),
-    pays.length ? h('section', { class: 'card fade-in' }, h('h2', {}, 'Paydays'), h('div', { class: 'list-in' }, pays.map(row))) : null,
+    pays.length ? h('section', { class: `card sage${rv}` }, h('h2', {}, 'Paydays'), h('div', { class: 'list-in' }, pays.map(row))) : null,
   ];
 }
 
 // ---------- One repeating item ----------
-export function openRuleSheet(rule) {
+export function openRuleSheet(rule, from = null) {
   const st = app.state;
   const next = nextOccurrence(rule);
-  const sheet = openSheet(rule.name, () => view());
+  const sheet = openSheet(rule.name, () => view(), { from });
 
   function view() {
     const dates = upcoming(rule, 3);

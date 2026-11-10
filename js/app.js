@@ -1,10 +1,12 @@
-import { h, icon } from './ui.js';
+import { h, icon, toast } from './ui.js';
 import { app, persist, newId } from './state.js';
 import { load } from './store.js';
 import { nowStamp, budgetMonth } from './dates.js';
 import { runRecurring } from './ops.js';
+import { goalProgress } from './budget.js';
 import { hasVault, isUnlocked, lock, flush } from './vault.js';
 import { showLock } from './lock.js';
+import { reveal, confetti } from './motion.js';
 import { renderHome } from './views/home.js';
 import { renderActivity } from './views/activity.js';
 import { renderGoals } from './views/goals.js';
@@ -22,49 +24,74 @@ const TABS = [
 
 let running = false; // true only while unlocked (or when no passcode is set)
 
-function render() {
+// animate: true when a screen opens (tab switch, app start, unlock). Plain redraws stay still.
+function render(animate = false) {
   if (!running) return;
   const root = document.getElementById('app');
   const now = nowStamp();
   const v = app.view;
   const period = budgetMonth(now, app.state.settings.monthStartDay);
   const screen = {
-    home: () => renderHome(now),
-    activity: () => renderActivity(now),
-    goals: () => renderGoals(now),
-    reminders: () => renderReminders(now),
+    home: () => renderHome(now, animate),
+    activity: () => renderActivity(now, animate),
+    goals: () => renderGoals(now, animate),
+    reminders: () => renderReminders(now, animate),
   }[v.tab]();
 
+  const screenEl = h('div', { class: `screen${animate ? ' enter' : ''}` }, screen);
+  screenEl.addEventListener('animationend', () => screenEl.classList.remove('enter'), { once: true });
   root.replaceChildren(
     h('main', { class: 'shell' },
       h('header', { class: 'topbar' },
         h('div', {},
           h('div', { class: 'eyebrow' }, v.tab === 'home' || v.tab === 'goals' ? period.label : 'My Budget'),
           h('h1', {}, TABS.find((t) => t[0] === v.tab)[1])),
-        h('button', { class: 'round-btn', 'aria-label': 'Settings', onClick: () => openSettings() }, icon('gear'))),
-      screen),
+        h('button', { class: 'round-btn', 'aria-label': 'Settings', onClick: (e) => openSettings(null, e.currentTarget) }, icon('gear'))),
+      screenEl),
     h('button', { class: 'fab', 'aria-label': 'Add an entry', onClick: () => openEntrySheet() }, icon('plus')),
     h('div', { class: 'tabbar' },
       h('nav', { 'aria-label': 'Tabs' }, TABS.map(([id, label, ic]) =>
-        h('button', { class: 'tab', 'aria-current': v.tab === id ? 'page' : null, onClick: () => { v.tab = id; render(); window.scrollTo(0, 0); } },
-          icon(ic), label)))),
+        h('button', {
+          class: 'tab', 'aria-current': v.tab === id ? 'page' : null,
+          onClick: () => { if (v.tab === id) return; v.tab = id; window.scrollTo({ top: 0, behavior: 'instant' }); render(true); },
+        }, icon(ic), label)))),
   );
+  if (animate) reveal(root);
+  celebrate();
 }
-app.render = render;
+app.render = () => render(false);
+
+// Confetti the first time a savings goal is reached.
+function celebrate() {
+  const st = app.state;
+  const now = nowStamp();
+  const reached = st.goals.filter((g) => goalProgress(g, st.entries, now).reached).map((g) => g.id);
+  const before = st.celebrated;
+  if (before === null) { st.celebrated = reached; persist(); return; } // first run after updating: no surprise confetti
+  const fresh = reached.filter((id) => !before.includes(id));
+  if (!fresh.length && reached.length === before.length) return;
+  st.celebrated = reached;
+  persist();
+  if (fresh.length) {
+    confetti();
+    const g = st.goals.find((x) => x.id === fresh[0]);
+    if (g && !document.querySelector('.toast')) toast(`You reached ${g.name}!`);
+  }
+}
 
 // Add anything repeating whose date and time have arrived, then show what was added.
-function catchUp() {
+function catchUp(animate = false) {
   if (!running) return;
   const added = runRecurring(app.state, nowStamp(), newId);
   if (added.length) persist();
-  render();
+  render(animate);
   if (app.state.notice.length) openWelcome();
 }
 
 function start(state) {
   app.state = state;
   running = true;
-  catchUp();
+  catchUp(true);
 }
 
 // Lock: forget the key, clear the screen, show the passcode screen.
@@ -88,7 +115,7 @@ document.addEventListener('visibilitychange', () => {
 });
 
 // Re-check every 30 seconds so entries count right on time.
-setInterval(catchUp, 30_000);
+setInterval(() => catchUp(false), 30_000);
 
 if (hasVault()) showLock(start);
 else start(load());
