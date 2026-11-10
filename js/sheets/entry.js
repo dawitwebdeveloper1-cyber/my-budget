@@ -80,8 +80,8 @@ export function openEntrySheet(existing = null, preset = {}, { from = null, acti
 
     return [
       h('div', { class: 'seg', role: 'group', 'aria-label': 'Money in or out' },
-        h('button', { 'aria-pressed': String(d.type === 'expense'), onClick: () => { d.type = 'expense'; redraw(); } }, 'Money out'),
-        h('button', { 'aria-pressed': String(d.type === 'income'), onClick: () => { d.type = 'income'; redraw(); } }, 'Money in')),
+        h('button', { 'aria-pressed': String(d.type === 'income'), onClick: () => { d.type = 'income'; redraw(); } }, 'Money in'),
+        h('button', { 'aria-pressed': String(d.type === 'expense'), onClick: () => { d.type = 'expense'; redraw(); } }, 'Money out')),
       isPay() ? h('div', { class: 'seg small', role: 'group', 'aria-label': 'How to enter the paycheck' },
         h('button', { 'aria-pressed': String(d.payMode === 'amount'), onClick: () => { d.payMode = 'amount'; redraw(); } }, 'Amount'),
         h('button', { 'aria-pressed': String(d.payMode === 'hours'), onClick: () => { d.payMode = 'hours'; redraw(); } }, 'Hours × pay')) : null,
