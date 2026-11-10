@@ -1,38 +1,38 @@
 /* My Budget – colours live here only. Light by default; dark follows the phone's setting. */
 :root {
-  --bg: #F4F0EA;
-  --surface: #FFFDF9;          /* other cards */
-  --sheet: #F8F4EE;
-  --accent: #3A3631;           /* warm charcoal: main card, + button, active tab */
-  --accent-2: #4F4A44;         /* status pill and progress track on the main card */
-  --accent-soft: rgba(58, 54, 49, 0.08);
+  --bg: #F2F3F5;               /* soft neutral grey */
+  --surface: #FFFFFF;          /* other cards */
+  --sheet: #F7F8FA;
+  --accent: #2C3035;           /* neutral charcoal: main card, + button, active tab */
+  --accent-2: #42474D;         /* status pill and progress track on the main card */
+  --accent-soft: rgba(44, 48, 53, 0.08);
   --on-accent: #FFFFFF;
-  --on-accent-label: #D9D2C8;
-  --hero-fill: #F4EDE2;        /* progress fill on the main card */
-  --strong: #3A3631;           /* focus rings, links, dots, progress fills on light cards */
-  --in: #3F5139;               /* money in text */
-  --out: #94533A;              /* money out text */
-  --in-bg: #E3EADD;
-  --out-bg: #F3E1D3;
-  --soft: #EFE9E0;             /* quiet inner boxes: advice line, goal rows */
-  --settings-bg: #E8E1D6;
-  --tab-idle: #8A847C;
+  --on-accent-label: #C5CAD0;
+  --hero-fill: #EEF1F4;        /* progress fill on the main card */
+  --strong: #2C3035;           /* focus rings, links, dots, progress fills on light cards */
+  --in: #2F5A47;               /* money in text */
+  --out: #8E4A4A;              /* money out text */
+  --in-bg: #E1EDE7;
+  --out-bg: #F1E4E4;
+  --soft: #ECEEF1;             /* quiet inner boxes: advice line, goal rows */
+  --settings-bg: #E3E6EA;
+  --tab-idle: #868C93;
   --sage: var(--in-bg);
   --peach: var(--out-bg);
   --lav: var(--soft);
-  --text: #23211E;
-  --label: #5E5A55;
-  --faint: rgba(35, 33, 30, 0.45);
-  --line: rgba(35, 33, 30, 0.08);
-  --line-strong: rgba(35, 33, 30, 0.2);
-  --field: rgba(35, 33, 30, 0.05);
-  --track: rgba(35, 33, 30, 0.08);
-  --shadow: 0 6px 22px rgba(58, 54, 49, 0.06);
-  --shadow-lift: 0 14px 36px rgba(58, 54, 49, 0.16);
-  --scrim: rgba(27, 25, 23, 0.36);
-  /* spending category colours: deep, warm, saturated */
-  --c1: #B8401F; --c2: #D4900F; --c3: #4E6B2A; --c4: #7A2E2A; --c5: #8A5A2B;
-  --c6: #A8652A; --c7: #5F6B3A; --c8: #9C3B4A; --c9: #6E5F4E;
+  --text: #1D2125;
+  --label: #5A6068;
+  --faint: rgba(29, 33, 37, 0.45);
+  --line: rgba(29, 33, 37, 0.08);
+  --line-strong: rgba(29, 33, 37, 0.2);
+  --field: rgba(29, 33, 37, 0.05);
+  --track: rgba(29, 33, 37, 0.08);
+  --shadow: 0 6px 22px rgba(29, 33, 37, 0.06);
+  --shadow-lift: 0 14px 36px rgba(29, 33, 37, 0.16);
+  --scrim: rgba(18, 20, 23, 0.36);
+  /* spending category colours: calm and mostly cool */
+  --c1: #3F6E91; --c2: #4E8C7D; --c3: #7466A0; --c4: #A85A55; --c5: #5E8150;
+  --c6: #6C93B8; --c7: #956A88; --c8: #4A5E70; --c9: #8A9097;
 
   --font: ui-rounded, "SF Pro Rounded", "Nunito", "Varela Round", system-ui, -apple-system, "Segoe UI", sans-serif;
   --r-card: 26px;
@@ -46,35 +46,35 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #1B1917;
-    --surface: #25221F;
-    --sheet: #221F1C;
-    --accent: #45403A;
-    --accent-2: #5A544D;
-    --accent-soft: rgba(242, 238, 232, 0.08);
+    --bg: #15171A;
+    --surface: #1F2226;
+    --sheet: #1B1E21;
+    --accent: #32373D;
+    --accent-2: #474D54;
+    --accent-soft: rgba(236, 239, 242, 0.08);
     --on-accent: #FFFFFF;
-    --on-accent-label: #D9D2C8;
-    --hero-fill: #EDE5D8;
-    --strong: #E8E1D6;
-    --in: #AFCBA3;
-    --out: #EBA88B;
-    --in-bg: #29342A;
-    --out-bg: #3D2A23;
-    --soft: #2E2A26;
-    --settings-bg: #2E2A26;
-    --tab-idle: #8A847C;
-    --text: #F2EEE8;
-    --label: #A8A39B;
-    --faint: rgba(242, 238, 232, 0.45);
-    --line: rgba(242, 238, 232, 0.08);
-    --line-strong: rgba(242, 238, 232, 0.2);
-    --field: rgba(242, 238, 232, 0.06);
-    --track: rgba(242, 238, 232, 0.1);
+    --on-accent-label: #C5CAD0;
+    --hero-fill: #E6EAEE;
+    --strong: #DDE2E7;
+    --in: #A3CDB8;
+    --out: #E3A7A4;
+    --in-bg: #213029;
+    --out-bg: #352628;
+    --soft: #282C31;
+    --settings-bg: #282C31;
+    --tab-idle: #80878F;
+    --text: #ECEFF2;
+    --label: #9EA5AD;
+    --faint: rgba(236, 239, 242, 0.45);
+    --line: rgba(236, 239, 242, 0.08);
+    --line-strong: rgba(236, 239, 242, 0.2);
+    --field: rgba(236, 239, 242, 0.06);
+    --track: rgba(236, 239, 242, 0.1);
     --shadow: 0 6px 22px rgba(0, 0, 0, 0.25);
     --shadow-lift: 0 14px 36px rgba(0, 0, 0, 0.5);
     --scrim: rgba(0, 0, 0, 0.5);
-    --c1: #D45A35; --c2: #E5A42B; --c3: #7A9A4E; --c4: #A9483F; --c5: #B07A45;
-    --c6: #D1823F; --c7: #8E9A5A; --c8: #C25A68; --c9: #9C8B76;
+    --c1: #6E9CC2; --c2: #6FB3A2; --c3: #A396CC; --c4: #D2837D; --c5: #8BB07A;
+    --c6: #94B9DB; --c7: #C495B6; --c8: #7F96AB; --c9: #A9AFB6;
     color-scheme: dark;
   }
 }
@@ -495,7 +495,7 @@ input[type="date"].input, input[type="time"].input { min-height: 52px; }
 .card { margin-bottom: 16px; padding: 22px; }
 .tab { color: var(--tab-idle); }
 .tab[aria-current="page"] { color: var(--text); background: var(--soft); }
-.fab { box-shadow: 0 10px 26px rgba(27, 25, 23, 0.28); }
+.fab { box-shadow: 0 10px 26px rgba(18, 20, 23, 0.28); }
 @media (prefers-color-scheme: dark) { .fab { border: 1px solid var(--line-strong); } }
 button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus-visible { outline-color: var(--strong); }
 .input:focus { border-color: var(--strong); }
@@ -514,14 +514,14 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .set-section, .set-section:nth-of-type(1), .set-section:nth-of-type(2), .set-section:nth-of-type(3) { background: var(--surface); box-shadow: var(--shadow); }
 .set-body .rows, .set-body .btn.ghost { background: var(--soft); }
 .chip[aria-pressed="true"], .switch input:checked + .track { background: var(--accent); }
-@media (prefers-color-scheme: dark) { .chip[aria-pressed="true"], .switch input:checked + .track { background: #6A635B; } }
+@media (prefers-color-scheme: dark) { .chip[aria-pressed="true"], .switch input:checked + .track { background: #5B636C; } }
 .empty .em-ic { background: var(--soft); color: var(--label); }
 .snapshot .totals-mini .row, .snapshot .totals-mini .row:first-child, .snapshot .totals-mini .row:last-child { background: var(--soft); }
 .totals-mini .row:first-child { background: var(--in-bg); }
 .totals-mini .row:last-child { background: var(--out-bg); }
 
 /* Main card: big number, status pill, budget progress inside */
-.hero { background: var(--accent); color: var(--on-accent); box-shadow: 0 14px 34px rgba(27, 25, 23, 0.22); padding: 26px 22px 22px; }
+.hero { background: var(--accent); color: var(--on-accent); box-shadow: 0 14px 34px rgba(18, 20, 23, 0.22); padding: 26px 22px 22px; }
 .hero .label { color: var(--on-accent-label); opacity: 1; }
 .hero .big { margin: 8px 0 14px; }
 .hero .pill { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 999px; background: var(--accent-2); font-size: 14.5px; font-weight: 700; }
@@ -529,7 +529,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .hero .hero-bar { height: 10px; border-radius: 999px; background: var(--accent-2); overflow: hidden; margin: 20px 0 8px; }
 .hero .hero-bar i { display: block; height: 100%; border-radius: 999px; background: var(--hero-fill); }
 .hero .hero-bar.fill i { transition: width .9s var(--ease); }
-.hero .hero-bar i.over { background: #EBA88B; }
+.hero .hero-bar i.over { background: #E3A7A4; }
 .hero .used { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: 100%; font-size: 14.5px; color: var(--on-accent-label); text-align: left; }
 .hero .used > span:last-child { font-size: 13px; }
 .hero .used b { color: var(--on-accent); font-weight: 800; }
