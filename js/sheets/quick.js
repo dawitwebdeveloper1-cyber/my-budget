@@ -8,6 +8,21 @@ import { signed } from '../calc.js';
 import { addEntry, quickEntry } from '../ops.js';
 import { suggestCategories, merchantCategory } from '../suggest.js';
 import { voiceAvailable, listen, bestGuess } from '../voice.js';
+import { photoToCanvas, scanReceipt, highlight } from '../scan.js';
+
+// A band of the photo around the total line (or the top of the receipt), sized to fit the screen.
+function cropAround(canvas, bbox) {
+  const bandH = Math.min(canvas.height, Math.max(220, Math.round(canvas.width * 0.55)));
+  const mid = bbox ? (bbox.y0 + bbox.y1) / 2 : bandH / 2;
+  const y = Math.max(0, Math.min(canvas.height - bandH, Math.round(mid - bandH / 2)));
+  const out = document.createElement('canvas');
+  out.width = canvas.width;
+  out.height = bandH;
+  out.getContext('2d').drawImage(canvas, 0, y, canvas.width, bandH, 0, 0, canvas.width, bandH);
+  out.setAttribute('role', 'img');
+  out.setAttribute('aria-label', 'Part of your receipt photo');
+  return out;
+}
 import { openEntrySheet } from './entry.js';
 
 export function openQuickAdd(from = null) {
@@ -35,6 +50,7 @@ export function openQuickAdd(from = null) {
         h('button', { 'aria-pressed': String(d.type === 'expense'), onClick: () => setType('expense') }, 'Money out')),
       favEl,
       h('div', { class: 'qa-amount-row' },
+        d.type === 'expense' ? h('button', { class: 'cam-btn', 'aria-label': 'Scan a receipt', onClick: pickPhoto }, icon('camera')) : null,
         amountEl,
         // The mic only shows where the phone supports speech, and hides after two failures.
         voiceAvailable() ? h('button', { class: 'mic-btn', 'aria-label': 'Say it instead', onClick: startVoice }, icon('mic')) : null),
@@ -208,6 +224,72 @@ export function openQuickAdd(from = null) {
     const entry = quickEntry({ type: v.type, cents: v.cents, category: v.category, name: v.name, at: nowStamp(), newId });
     sheet.close();
     change((st) => addEntry(st, entry, newId), `Saved ${formatCents(signed(entry), { sign: 'always' })} · ${v.category}`);
+  }
+
+  // ---- Receipt scanning: photo → read on the phone → confirm card with the total highlighted
+  function pickPhoto() {
+    const input = h('input', { type: 'file', accept: 'image/*', capture: 'environment', class: 'sr' });
+    input.addEventListener('change', () => { const f = input.files?.[0]; input.remove(); if (f) readPhoto(f); });
+    document.body.append(input);
+    input.click();
+  }
+
+  async function readPhoto(file) {
+    const fill = h('i');
+    const label = h('p', { class: 'dim center' }, 'Getting the reader ready');
+    sheet.setTitle('Reading your receipt…');
+    sheet.setContent(h('div', { class: 'voice-wrap' },
+      h('div', { class: 'mic-big on', 'aria-hidden': 'true' }, icon('camera')),
+      h('div', { class: 'bar scan-bar', role: 'progressbar', 'aria-label': 'Reading progress' }, fill),
+      label,
+      h('p', { class: 'faint small-note center' }, 'Your photo stays on this phone.')));
+    fill.style.width = '2%';
+    let canvas;
+    try {
+      canvas = await photoToCanvas(file);
+      const result = await scanReceipt(canvas, (p, text) => {
+        fill.style.width = `${Math.round(p * 100)}%`;
+        label.textContent = text;
+      });
+      if (!sheet.el.isConnected) return;
+      if (!result.total || result.confidence < 30) couldntRead(canvas, result.store);
+      else confirmScan(canvas, result);
+    } catch {
+      if (sheet.el.isConnected) couldntRead(canvas, '');
+    }
+  }
+
+  // Blurry or unreadable: offer to type it, with the store name filled in if we got it.
+  function couldntRead(canvas, store) {
+    sheet.setTitle('Couldn\'t read that one');
+    sheet.setContent(
+      canvas ? h('div', { class: 'scan-photo' }, cropAround(canvas, null)) : null,
+      h('p', { class: 'dim center' }, store ? `Looks like ${store}. Type the amount in?` : 'The photo may be blurry or too dark. Type it in?'),
+      h('div', { class: 'actions' },
+        h('button', { class: 'btn primary', onClick: () => { d.type = 'expense'; d.name = store || d.name; backToKeypad(); } }, 'Type it in'),
+        h('button', { class: 'btn ghost', onClick: pickPhoto }, 'Try another photo')));
+  }
+
+  function confirmScan(canvas, r) {
+    const v = { cents: r.total.cents, name: r.store, category: merchantCategory(s, r.store, 'expense') };
+    const line = r.lines[r.total.line];
+    sheet.setTitle('Is this right?');
+    const draw = () => {
+      const cats = v.category ? s.categories.expense : suggestCategories(s, { type: 'expense', cents: v.cents, name: v.name, now: nowStamp(), limit: s.categories.expense.length });
+      sheet.setContent(
+        h('div', { class: 'scan-photo' }, cropAround(highlight(canvas, line?.bbox), line?.bbox)),
+        h('div', { class: 'qa-amount num out' }, formatCents(-v.cents, { sign: 'always' })),
+        h('p', { class: 'qa-hint' }, r.total.how === 'total' ? 'Read from the TOTAL line (highlighted). Check it matches.' : 'No TOTAL line found, so this is the largest amount (highlighted). Check it.'),
+        h('input', { class: 'input qa-name', value: v.name, maxlength: 80, placeholder: 'Store (optional)', onInput: (e) => { v.name = e.target.value; } }),
+        h('div', { class: 'qa-cats-wrap' },
+          h('div', { class: 'qa-hint' }, v.category ? 'Category' : 'Pick a category'),
+          h('div', { class: 'chips' }, cats.map((c) => h('button', { class: 'chip', 'aria-pressed': String(c === v.category), onClick: () => { v.category = c; draw(); } }, c)))),
+        h('div', { class: 'actions' },
+          h('button', { class: 'btn primary', disabled: !v.category, onClick: () => saveVoice({ type: 'expense', cents: v.cents, category: v.category, name: v.name }) }, 'Save'),
+          h('button', { class: 'btn ghost', onClick: () => { d.type = 'expense'; d.amount = centsToInput(v.cents).replace(/\.00$/, ''); d.name = v.name; backToKeypad(); } }, 'Fix it on the keypad'),
+          h('button', { class: 'link', onClick: pickPhoto }, 'Try another photo')));
+    };
+    draw();
   }
 
   // Date, time, repeating, hours × pay: the full form, with what's typed so far carried over.
