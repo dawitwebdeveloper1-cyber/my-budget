@@ -17,11 +17,11 @@ export function renderGoals(now, animate = false) {
   // ---- Savings goals
   const goalRows = st.goals.map((g) => {
     const p = goalProgress(g, st.entries, now);
-    const auto = st.settings.autoSaveGoalId === g.id && st.settings.autoSaveBp > 0;
+    const autoBp = (st.settings.autoSave ?? []).find((a) => a.goalId === g.id)?.bp ?? 0;
     return h('button', { class: 'goal', onClick: (e) => openGoalSheet(g, e.currentTarget) },
       h('div', { class: 'goal-top' },
         h('span', { class: 'goal-name' }, g.name),
-        p.reached ? h('span', { class: 'badge' }, 'Reached') : auto ? h('span', { class: 'badge' }, `Auto-save ${formatPercent(st.settings.autoSaveBp)}`) : null),
+        p.reached ? h('span', { class: 'badge' }, 'Reached') : autoBp ? h('span', { class: 'badge' }, `Auto-save ${formatPercent(autoBp)}`) : null),
       p.ok
         ? [h('div', { class: 'goal-amts' }, h('span', { class: 'num' }, formatCents(p.value)), h('span', { class: 'faint' }, ` of ${formatCents(g.targetCents)}`)),
           bar(p.percent, { gold: true, fill }),
@@ -64,7 +64,7 @@ export function renderGoals(now, animate = false) {
 }
 
 // ---------- Goal sheet ----------
-function openGoalSheet(goal, from = null) {
+export function openGoalSheet(goal, from = null, prefill = 0) {
   const st = app.state;
   const d = { name: goal?.name ?? '', target: goal ? centsToInput(goal.targetCents) : '', add: '', pct: '' };
   let errors = {};
@@ -73,7 +73,10 @@ function openGoalSheet(goal, from = null) {
   function view() {
     if (!goal) return editForm();
     const p = goalProgress(goal, st.entries, nowStamp());
-    const isAuto = st.settings.autoSaveGoalId === goal.id && st.settings.autoSaveBp > 0;
+    const plan = app.state.settings.autoSave ?? [];
+    const mine = plan.find((a) => a.goalId === goal.id)?.bp ?? 0;
+    const others = plan.filter((a) => a.goalId !== goal.id).reduce((a, p) => a + p.bp, 0);
+    const isAuto = mine > 0;
     return [
       p.ok ? h('div', { class: 'confirm-card' },
         h('div', { class: 'big num goal-big' }, formatCents(p.value)),
@@ -90,13 +93,13 @@ function openGoalSheet(goal, from = null) {
 
       h('div', { class: 'field' }, h('span', {}, 'Auto-save from each paycheck'),
         isAuto
-          ? h('div', { class: 'inline' }, h('span', { class: 'grow' }, `${formatPercent(st.settings.autoSaveBp)} of every paycheck comes here.`),
-            h('button', { class: 'btn ghost narrow', onClick: () => { change((s) => { s.settings.autoSaveBp = 0; s.settings.autoSaveGoalId = null; }, 'Auto-save turned off'); sheet.close(); } }, 'Turn off'))
+          ? h('div', { class: 'inline' }, h('span', { class: 'grow' }, `${formatPercent(mine)} of every paycheck comes here.`),
+            h('button', { class: 'btn ghost narrow', onClick: () => { change((s) => { s.settings.autoSave = (s.settings.autoSave ?? []).filter((a) => a.goalId !== goal.id); }, 'Auto-save to this goal turned off'); sheet.close(); } }, 'Turn off'))
           : h('div', { class: 'inline' },
             h('div', { class: 'pct-input grow' }, h('input', { class: 'input', inputmode: 'decimal', placeholder: '10', value: d.pct, onInput: (e) => { d.pct = e.target.value; } }), h('span', { class: 'cur-r' }, '%')),
-            h('button', { class: 'btn primary narrow', onClick: turnOnAuto }, 'Turn on'))),
+            h('button', { class: 'btn primary narrow', onClick: () => turnOnAuto(others) }, 'Turn on'))),
       errors.pct ? h('p', { class: 'error' }, errors.pct) : null,
-      st.settings.autoSaveGoalId && !isAuto ? h('p', { class: 'faint small-note' }, 'This will move auto-save here from your other goal.') : null,
+      others ? h('p', { class: 'faint small-note' }, `Your other goals already get ${formatPercent(others)} of each paycheck. This adds to that.`) : null,
 
       h('div', { class: 'actions' },
         h('button', { class: 'btn ghost', onClick: () => { sheet.setTitle('Edit goal'); sheet.setContent(editForm()); } }, 'Edit name or target'),
@@ -150,13 +153,18 @@ function openGoalSheet(goal, from = null) {
         h('button', { class: 'btn ghost', onClick: () => { sheet.setTitle(goal.name); sheet.setContent(view()); } }, 'Back')));
   }
 
-  function turnOnAuto() {
+  function turnOnAuto(others) {
     errors = {};
     const bp = parsePercent(d.pct);
     if (bp === null || bp === 0) { errors.pct = 'Enter a percentage, like 10'; sheet.setContent(view()); return; }
-    change((s) => { s.settings.autoSaveBp = bp; s.settings.autoSaveGoalId = goal.id; }, `Auto-save on: ${formatPercent(bp)} of each paycheck`);
+    if (bp + others > 10000) { errors.pct = `With your other goals that's ${formatPercent(bp + others)}. Keep the total at 100% or less.`; sheet.setContent(view()); return; }
+    change((s) => { s.settings.autoSave = [...(s.settings.autoSave ?? []).filter((a) => a.goalId !== goal.id), { goalId: goal.id, bp }]; },
+      `Auto-save on: ${formatPercent(bp)} of each paycheck to ${goal.name}`);
     sheet.close();
   }
+
+  // A bigger-than-usual paycheck: start with the extra filled in.
+  if (goal && prefill) { d.add = centsToInput(prefill).replace(/\.00$/, ''); sheet.setContent(view()); }
 
   function confirmDelete() {
     sheet.setTitle('Delete this goal?');

@@ -525,6 +525,10 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .hero { background: var(--accent); color: var(--on-accent); box-shadow: 0 14px 34px rgba(18, 20, 23, 0.22); padding: 26px 22px 22px; }
 .hero .label { color: var(--on-accent-label); opacity: 1; }
 .hero .big { margin: 8px 0 14px; }
+.hero .perday { display: block; margin: -6px 0 14px; font-size: 15px; color: var(--on-accent-label); text-align: left; }
+.hero .perday b { color: var(--on-accent); font-weight: 800; }
+.advice-go { text-align: left; flex: 1; font-weight: 600; }
+.auto-rows .set-line:first-child { border-top: 0; }
 .hero .pill { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 999px; background: var(--accent-2); font-size: 14.5px; font-weight: 700; }
 .hero .pill .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--hero-fill); }
 .hero .hero-bar { height: 10px; border-radius: 999px; background: var(--accent-2); overflow: hidden; margin: 20px 0 8px; }

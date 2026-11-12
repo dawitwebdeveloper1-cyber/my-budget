@@ -1,30 +1,33 @@
 // Every change to your data goes through here, so the rules are tested in one place.
 
 import { generateDue, nextOccurrence } from './recurring.js';
-import { autoSaveSplit } from './budget.js';
+import { splitAcrossGoals } from './budget.js';
 import { rememberMerchant } from './suggest.js';
 
 export const PAYCHECK = 'Paycheck';
 export const isPaycheck = (e) => e.type === 'income' && e.category === PAYCHECK;
 
-// The automatic savings entry for a paycheck (or null if auto-save is off).
-function savingFor(state, entry, newId) {
-  const { autoSaveBp: bp, autoSaveGoalId: goalId } = state.settings;
-  if (!isPaycheck(entry) || !bp) return null;
-  const goal = state.goals.find((g) => g.id === goalId);
-  if (!goal) return null;
-  const split = autoSaveSplit(entry.cents, bp, goal.name);
-  if (!split.ok || split.save <= 0) return null;
-  return {
-    id: newId(), type: 'saving', name: `To ${goal.name}`, cents: split.save, at: entry.at,
-    category: 'Savings', note: '', goalId: goal.id, parentId: entry.id, bp, ...(entry.auto ? { auto: true } : {}),
-  };
+// The automatic savings for a paycheck: one entry per goal in its auto-save plan.
+// Each paycheck remembers the plan it was saved with (entry.autoSave), so changing the
+// settings later never rewrites past paychecks.
+function savingsFor(state, entry, newId) {
+  if (!isPaycheck(entry)) return [];
+  if (!Array.isArray(entry.autoSave)) entry.autoSave = (state.settings.autoSave ?? []).map(({ goalId, bp }) => ({ goalId, bp }));
+  const plan = entry.autoSave
+    .map((p) => ({ ...p, name: state.goals.find((g) => g.id === p.goalId)?.name }))
+    .filter((p) => p.name && p.bp > 0);
+  if (!plan.length) return [];
+  const split = splitAcrossGoals(entry.cents, plan);
+  if (!split.ok) return [];
+  return split.shares.filter((s) => s.cents > 0).map((s) => ({
+    id: newId(), type: 'saving', name: `To ${s.name}`, cents: s.cents, at: entry.at,
+    category: 'Savings', note: '', goalId: s.goalId, parentId: entry.id, bp: s.bp, ...(entry.auto ? { auto: true } : {}),
+  }));
 }
 
 export function addEntry(state, entry, newId) {
   state.entries.push(entry);
-  const s = savingFor(state, entry, newId);
-  if (s) state.entries.push(s);
+  state.entries.push(...savingsFor(state, entry, newId));
   if (!entry.auto && entry.type !== 'saving') rememberMerchant(state, entry.name, entry.category, entry.type);
 }
 
@@ -56,16 +59,16 @@ export function updateEntry(state, entry, newId) {
   state.entries[i] = entry;
   // Changing a store's category teaches merchant memory the new one.
   if (entry.type !== 'saving') rememberMerchant(state, entry.name, entry.category, entry.type);
-  const linked = state.entries.find((e) => e.parentId === entry.id);
-  if (linked) {
-    const goal = state.goals.find((g) => g.id === linked.goalId);
-    const split = isPaycheck(entry) ? autoSaveSplit(entry.cents, linked.bp ?? 0, goal?.name) : null;
-    if (!split?.ok || split.save <= 0) state.entries = state.entries.filter((e) => e.id !== linked.id);
-    else Object.assign(linked, { cents: split.save, at: entry.at });
-  } else if (!isPaycheck(was)) {
-    const s = savingFor(state, entry, newId);
-    if (s) state.entries.push(s);
+  // Re-work this paycheck's savings with the plan it was saved with.
+  const linked = state.entries.filter((e) => e.parentId === entry.id);
+  state.entries = state.entries.filter((e) => e.parentId !== entry.id);
+  if (!isPaycheck(entry)) { delete entry.autoSave; return; }
+  if (!Array.isArray(entry.autoSave)) {
+    entry.autoSave = linked.length
+      ? linked.map((l) => ({ goalId: l.goalId, bp: l.bp ?? 0 }))
+      : isPaycheck(was) ? [] : undefined; // a paycheck saved with no auto-save stays that way
   }
+  state.entries.push(...savingsFor(state, entry, newId));
 }
 
 export function deleteEntry(state, id) {
@@ -186,8 +189,5 @@ export function addCategory(state, kind, name) {
 
 export function deleteGoal(state, goalId) {
   state.goals = state.goals.filter((g) => g.id !== goalId);
-  if (state.settings.autoSaveGoalId === goalId) {
-    state.settings.autoSaveGoalId = null;
-    state.settings.autoSaveBp = 0;
-  }
+  state.settings.autoSave = (state.settings.autoSave ?? []).filter((p) => p.goalId !== goalId);
 }

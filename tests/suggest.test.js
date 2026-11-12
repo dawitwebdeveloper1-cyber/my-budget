@@ -96,8 +96,7 @@ test('repeat copies an entry to today and it counts', () => {
 test('repeating a paycheck also repeats its auto-save', () => {
   const s = freshState();
   s.goals.push({ id: 'g', name: 'Car', targetCents: 100000 });
-  s.settings.autoSaveBp = 2000;
-  s.settings.autoSaveGoalId = 'g';
+  s.settings.autoSave = [{ goalId: 'g', bp: 2000 }];
   const pay = { id: id(), type: 'income', name: 'Paycheck', cents: 50001, at: '2026-11-06T09:00', category: 'Paycheck', note: '' };
   addEntry(s, pay, id);
   repeatEntry(s, pay, NOW, id);

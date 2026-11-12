@@ -69,6 +69,7 @@ export function openReceipt(result, from = null) {
 export function receiptBody(result) {
   if (result?.receipt?.kind === 'product') return productReceipt(result);
   if (result?.receipt?.kind === 'ratio') return ratioReceipt(result);
+  if (result?.receipt?.kind === 'divide') return divideReceipt(result);
   if (!result?.ok || !receiptMatches(result.receipt, result.value)) return h('p', { class: 'unverified' }, UNVERIFIED);
   const r = result.receipt;
   const lines = r.lines.map((l) => h('div', { class: 'r-line' },
@@ -104,6 +105,28 @@ function ratioReceipt(result) {
       h('p', { class: 'receipt-foot' }, 'Rounded down so it never reaches a milestone early · worked out two ways, both match')),
     part(r.spentLabel, r.spentReceipt, r.spent),
     part(r.baseLabel, r.baseReceipt, r.base));
+}
+
+// An amount split evenly (per day, or an average), shown as column division, rounded down.
+function divideReceipt(result) {
+  const r = result.receipt;
+  const by = Number(r.by);
+  const partsOk = !r.parts || r.parts.reduce((a, p) => a + p.cents, 0) === r.top;
+  if (!result.ok || !Number.isInteger(by) || by < 1 || !partsOk
+    || Math.floor(r.top / by) !== r.result || Number(BigInt(r.top) / BigInt(by)) !== result.value) {
+    return h('p', { class: 'unverified' }, UNVERIFIED);
+  }
+  const left = r.top - r.result * by;
+  const line = (l, v) => h('div', { class: 'r-line' }, h('div', { class: 'l' }, l), h('div', { class: 'r' }, v));
+  return h('div', {},
+    h('div', { class: 'receipt' },
+      line(r.topLabel, formatCents(r.top)),
+      line(`÷ ${r.byLabel}`, String(by)),
+      h('hr', { class: 'rule' }),
+      h('div', { class: 'r-total' }, h('div', {}, 'Each (rounded down)'), h('div', { class: 'r num' }, formatCents(r.result))),
+      h('p', { class: 'receipt-foot' }, `${left ? `${formatCents(left)} left over from rounding down · ` : ''}worked out two ways, both match`)),
+    r.parts ? h('div', { class: 'receipt-part' }, h('h4', {}, r.topLabel),
+      receiptBody({ ok: true, value: r.top, receipt: { totalLabel: 'Added up', lines: r.parts.map((p) => ({ ...p, type: 'income' })) } })) : null);
 }
 
 // Hours × hourly pay, shown as column multiplication.

@@ -82,6 +82,38 @@ export function autoSaveSplit(paycheckCents, bp, goalName = 'savings') {
   return { ok: true, save: save.value, spend: spend.value, value: spend.value, receipt };
 }
 
+// ---------- Auto-save across several goals ----------
+// parts: [{ goalId, bp, name }] in order. Each goal gets its own percentage (rounded down);
+// the total saved is worked out from the total percentage, and any cents left over from
+// rounding go to the first goal. Whatever isn't saved is spendable.
+export function splitAcrossGoals(paycheckCents, parts) {
+  assertCents(paycheckCents);
+  const list = parts.filter((p) => p.bp > 0);
+  const totalBp = list.reduce((a, p) => a + p.bp, 0);
+  if (!list.length || totalBp > 10000) return { ok: false };
+  const totalA = Math.floor((paycheckCents * totalBp) / 10000);
+  const totalB = Number((BigInt(paycheckCents) * BigInt(totalBp)) / 10000n);
+  const total = checked(totalA, totalB);
+  if (!total.ok) return { ok: false };
+  const shares = list.map((p) => ({ goalId: p.goalId, bp: p.bp, name: p.name, cents: Number((BigInt(paycheckCents) * BigInt(p.bp)) / 10000n) }));
+  const leftover = total.value - shares.reduce((a, s) => a + s.cents, 0);
+  if (leftover < 0 || leftover >= list.length) return { ok: false }; // can't happen; refuse rather than guess
+  shares[0].cents += leftover;
+  const spend = paycheckCents - total.value;
+  const receipt = {
+    title: 'Paycheck split', totalLabel: 'Spendable',
+    lines: [
+      { label: 'Paycheck', cents: paycheckCents },
+      ...shares.map((s, i) => ({
+        label: `To ${s.name ?? 'savings'} (${formatPercent(s.bp)})${i === 0 && leftover ? ` + ${leftover}¢ rounding` : ''}`,
+        cents: -s.cents, type: 'saving',
+      })),
+    ],
+  };
+  if (!receiptMatches(receipt, spend)) return { ok: false };
+  return { ok: true, shares, save: total.value, spend, value: spend, leftover, receipt };
+}
+
 // ---------- Savings goals ----------
 export function goalProgress(goal, entries, now) {
   const mine = entries.filter((e) => e.type === 'saving' && e.goalId === goal.id && e.at <= now)

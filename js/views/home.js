@@ -11,6 +11,9 @@ import { backupDue } from '../backup.js';
 import { hasVault } from '../vault.js';
 import { openPasscodeSetup } from '../lock.js';
 import { openSettings } from '../sheets/settings.js';
+import { openPaySetup } from '../sheets/paysetup.js';
+import { leftUntilPayday, bigPaycheck, bonusHeadsUp } from '../pay.js';
+import { openGoalSheet } from './goals.js';
 
 // animate: true when the Home screen opens (count-up, progress fill, chart draw-in).
 export function renderHome(now, animate = false) {
@@ -29,23 +32,42 @@ export function renderHome(now, animate = false) {
     unknown: UNVERIFIED,
   }[sum.status];
 
-  // ---- "What's left": the teal centrepiece
+  // ---- The centrepiece: "Left until payday" (or this month's "What's left" until pay is set up)
+  const lup = leftUntilPayday(st, now);
+  const main = lup.ok ? lup : sum.left;
   const big = h('span', { class: 'big num' });
-  if (sum.left.ok) {
-    if (motion) countUp(big, sum.left.value, (v) => formatCents(v), { duration: 1000, delay: 120 });
-    else big.textContent = formatCents(sum.left.value);
+  if (main.ok) {
+    if (motion) countUp(big, main.value, (v) => formatCents(v), { duration: 1000, delay: 120 });
+    else big.textContent = formatCents(main.value);
+  }
+  let sub = null;
+  if (lup.ok) {
+    const when = lup.next
+      ? `${lup.info.estimated ? 'next pay expected' : 'payday'} ${lup.nextLabel}`
+      : 'next pay any day now';
+    sub = !lup.next && !lup.info.overdue
+      ? h('button', { class: 'perday press', onClick: () => openPaySetup() }, 'Add your payday to see a daily amount ›')
+      : h('div', { class: 'perday' },
+      lup.perDay
+        ? h('button', { class: 'press', onClick: (e) => openReceipt(lup.perDay, e.currentTarget.closest('.card')) },
+          'About ', h('b', { class: 'num' }, formatCents(lup.perDay.value)), ' a day')
+        : null,
+      h('span', {}, lup.perDay ? ` · ${when}` : when));
+  } else if (lup.reason === 'nopay') {
+    sub = h('button', { class: 'perday press', onClick: () => openPaySetup() }, 'Set up your pay to see "Left until payday" ›');
   }
   const casual = casualStatus({ summary: sum, snapshot, progress, period, now });
   const hero = h('section', { class: `card hero${rv}` },
-    h('div', { class: 'label' }, "What's left"),
-    sum.left.ok ? big : h('p', { class: 'unverified' }, UNVERIFIED),
+    h('div', { class: 'label' }, lup.ok ? 'Left until payday' : "What's left"),
+    main.ok ? big : h('p', { class: 'unverified' }, UNVERIFIED),
+    sub,
     casual ? h('div', {}, h('span', { class: 'pill' }, h('span', { class: 'dot' }), casual)) : null,
     heroProgress(progress, motion),
     // Ahead / behind this month, with its own "show me how"
     h('div', { class: 'net' },
       h('button', { class: 'press', onClick: (e) => sum.net.ok && openReceipt(sum.net, e.currentTarget.closest('.card')) },
         `${statusText} `, sum.net.ok ? h('b', { class: 'num' }, formatCents(sum.net.value, { sign: 'always' })) : null),
-      sum.left.ok ? howButton(sum.left) : null));
+      main.ok ? howButton(main) : null));
 
   // ---- One gentle line at a time: home screen first (keeps data safe), then passcode, backup, advice.
   let advice = null;
@@ -60,8 +82,19 @@ export function renderHome(now, animate = false) {
     advice = h('button', { class: `advice action${rv}`, onClick: () => openSettings('backup') },
       h('span', {}, backupDays === Infinity ? "You haven't made a backup yet. Tap to save one." : `It's been ${backupDays} days since your last backup. Tap to save one.`), icon('right'));
   } else if (st.settings.adviceOn) {
-    const note = adviceNote({ budgets: categoryBudgets(st, period, now), summary: sum, snapshot, period, now, dismissed: st.dismissedAdvice });
-    if (note) {
+    // Paycheck notes first (a much bigger paycheck than usual, a bonus-paycheck month), then spending.
+    const big2 = bigPaycheck(st, now);
+    const bonus = bonusHeadsUp(st, now);
+    const dismissed = st.dismissedAdvice;
+    const note = big2 && !dismissed.includes(big2.key)
+      ? { key: big2.key, text: `This paycheck is ${formatCents(big2.extra)} more than usual. Put some toward a goal?`, action: () => openGoalSheet(st.goals[0] ?? null, null, big2.extra) }
+      : bonus && !dismissed.includes(bonus.key) ? bonus
+        : adviceNote({ budgets: categoryBudgets(st, period, now), summary: sum, snapshot, period, now, dismissed });
+    if (note?.action) {
+      advice = h('div', { class: `advice${rv}`, role: 'note' },
+        h('button', { class: 'advice-go press', onClick: note.action }, note.text),
+        h('button', { class: 'advice-x', 'aria-label': 'Dismiss note', onClick: () => { st.dismissedAdvice.push(note.key); persist(); app.render(); } }, icon('close')));
+    } else if (note) {
       advice = h('div', { class: `advice${rv}`, role: 'note' },
         h('span', {}, note.text),
         h('button', { class: 'advice-x', 'aria-label': 'Dismiss note', onClick: () => { st.dismissedAdvice.push(note.key); persist(); app.render(); } }, icon('close')));
@@ -93,6 +126,7 @@ export function renderHome(now, animate = false) {
     h('span', { class: 'how-ic', 'aria-label': 'Show me how' }, icon('receipt')));
   const extra = h('section', { class: `card${rv}` },
     h('div', { class: 'rows' },
+      lup.ok ? row(`What's left in ${period.short}`, sum.left, sum.left.value < 0 ? 'out' : 'in') : null,
       row(`Carried over from ${sum.previousLabel}`, sum.carry, sum.carry.value < 0 ? 'out' : 'in'),
       sum.saved.ok && sum.saved.value !== 0 ? row('Moved to savings', sum.saved, 'save') : null));
 

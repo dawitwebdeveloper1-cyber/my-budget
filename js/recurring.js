@@ -6,9 +6,20 @@ import { parseStamp, makeStamp, addDays, daysInMonth } from './dates.js';
 export const FREQS = {
   weekly: 'Weekly',
   biweekly: 'Every 2 weeks',
+  semimonthly: 'Twice a month',
   monthly: 'Monthly',
   yearly: 'Yearly',
 };
+
+// Choices for bills and other repeating entries (twice a month is set up from "Your pay").
+export const REPEAT_CHOICES = Object.entries(FREQS).filter(([k]) => k !== 'semimonthly');
+export const PAY_CHOICES = Object.entries(FREQS).filter(([k]) => k !== 'yearly');
+
+// Twice a month: two days, e.g. [15, 31]. 31 means "the last day of the month".
+export function semiDays(rule) {
+  const d = Array.isArray(rule.days) ? rule.days : [15, 31];
+  return [Math.min(d[0], d[1]), Math.max(d[0], d[1])];
+}
 
 export const KINDS = {
   paycheck: 'Paycheck',
@@ -25,6 +36,15 @@ export function occurrenceAt(rule, k) {
   let y, m, d;
   if (rule.freq === 'weekly' || rule.freq === 'biweekly') {
     ({ y, m, d } = addDays(p.y, p.m, p.d, (rule.freq === 'weekly' ? 7 : 14) * k));
+  } else if (rule.freq === 'semimonthly') {
+    // The first date is one of the two days; after that it alternates between them every month.
+    const [d1, d2] = semiDays(rule);
+    const startsOnSecond = p.d !== Math.min(d1, daysInMonth(p.y, p.m)) ? 1 : 0;
+    const i = k + startsOnSecond;
+    const idx = p.y * 12 + (p.m - 1) + Math.floor(i / 2);
+    y = Math.floor(idx / 12);
+    m = (idx % 12) + 1;
+    d = Math.min(i % 2 === 0 ? d1 : d2, daysInMonth(y, m));
   } else if (rule.freq === 'monthly' || rule.freq === 'yearly') {
     const idx = p.y * 12 + (p.m - 1) + (rule.freq === 'monthly' ? k : 12 * k);
     y = Math.floor(idx / 12);
@@ -148,6 +168,10 @@ export function rrule(rule) {
   switch (rule.freq) {
     case 'weekly': return 'FREQ=WEEKLY';
     case 'biweekly': return 'FREQ=WEEKLY;INTERVAL=2';
+    case 'semimonthly': {
+      const [d1, d2] = semiDays(rule);
+      return `FREQ=MONTHLY;BYMONTHDAY=${d1},${d2 === 31 ? -1 : d2}`;
+    }
     case 'monthly':
       if (p.d <= 28) return `FREQ=MONTHLY;BYMONTHDAY=${p.d}`;
       // e.g. the 31st: "the last of the 28th–31st that exists" = last day in short months

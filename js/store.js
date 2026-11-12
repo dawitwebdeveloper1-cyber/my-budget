@@ -17,8 +17,8 @@ export const DEFAULT_CATEGORIES = {
 export const DEFAULT_SETTINGS = {
   monthStartDay: 1,
   weekStartDay: 1,
-  autoSaveBp: 0,          // auto-save percentage in basis points (1000 = 10%)
-  autoSaveGoalId: null,
+  autoSave: [],           // [{ goalId, bp }]: each goal's share of every paycheck (1000 bp = 10%)
+  payMode: 'schedule',    // 'schedule' (a repeating paycheck) or 'irregular' (gig work, changing shifts)
   hourlyRateCents: null,  // remembered for the paycheck logger
   adviceOn: true,
   eventHour: 9,           // calendar events at 9:00 AM
@@ -30,7 +30,7 @@ export const DEFAULT_SETTINGS = {
 
 export function freshState() {
   return {
-    version: 3, // keep equal to DATA_VERSION
+    version: 4, // keep equal to DATA_VERSION
     entries: [],
     recurring: [],
     goals: [],
@@ -50,6 +50,22 @@ export function freshState() {
 const str = (v, max) => (typeof v === 'string' ? v.slice(0, max) : '');
 const cents = (v) => Number.isSafeInteger(v) && v > 0 && v <= MAX_ENTRY_CENTS;
 const optStr = (v, max) => (typeof v === 'string' && v ? v.slice(0, max) : undefined);
+
+// An auto-save plan: up to 10 goals, each with a share of 0–100%, adding up to at most 100%.
+export function cleanPlan(plan) {
+  if (!Array.isArray(plan)) return [];
+  const seen = new Set();
+  const out = [];
+  let total = 0;
+  for (const p of plan.slice(0, 10)) {
+    if (!p || typeof p.goalId !== 'string' || seen.has(p.goalId) || !Number.isInteger(p.bp) || p.bp < 0 || p.bp > 10000) continue;
+    if (total + p.bp > 10000) continue;
+    seen.add(p.goalId);
+    total += p.bp;
+    out.push({ goalId: p.goalId.slice(0, 64), bp: p.bp });
+  }
+  return out;
+}
 
 // Only keep entries that are completely valid, so bad data can never reach the maths.
 export function cleanEntry(e) {
@@ -77,6 +93,7 @@ export function cleanEntry(e) {
   const pid = optStr(e.parentId, 64);
   if (pid) out.parentId = pid;
   if (Number.isInteger(e.bp) && e.bp >= 0 && e.bp <= 10000) out.bp = e.bp;
+  if (Array.isArray(e.autoSave)) out.autoSave = cleanPlan(e.autoSave);
   if (e.imported === true) out.imported = true;
   const ik = optStr(e.importKey, 200);
   if (ik) out.importKey = ik;
@@ -105,6 +122,13 @@ export function cleanRule(r) {
     nextIndex: Number.isInteger(r.nextIndex) && r.nextIndex >= 0 ? r.nextIndex : 0,
     endAt: isStamp(r.endAt) ? r.endAt : null,
   };
+  // Twice a month: the two days (the first 1–28, the second up to 28 or 31 = last day).
+  if (out.freq === 'semimonthly') {
+    const d = Array.isArray(r.days) ? r.days.map(Number) : [];
+    const ok = d.length === 2 && Number.isInteger(d[0]) && Number.isInteger(d[1])
+      && d[0] >= 1 && d[0] <= 28 && d[1] > d[0] && (d[1] <= 28 || d[1] === 31);
+    out.days = ok ? d : [15, 31];
+  }
   // Only paychecks logged as hours × pay carry these.
   if (Number.isSafeInteger(r.hours) && r.hours > 0 && Number.isSafeInteger(r.rateCents) && r.rateCents > 0) {
     out.hours = r.hours;
@@ -175,8 +199,8 @@ export function cleanState(raw) {
   const t = s.settings;
   if (Number.isInteger(st.monthStartDay) && st.monthStartDay >= 1 && st.monthStartDay <= 31) t.monthStartDay = st.monthStartDay;
   if (Number.isInteger(st.weekStartDay) && st.weekStartDay >= 0 && st.weekStartDay <= 6) t.weekStartDay = st.weekStartDay;
-  if (Number.isInteger(st.autoSaveBp) && st.autoSaveBp >= 0 && st.autoSaveBp <= 10000) t.autoSaveBp = st.autoSaveBp;
-  if (typeof st.autoSaveGoalId === 'string' && s.goals.some((g) => g.id === st.autoSaveGoalId)) t.autoSaveGoalId = st.autoSaveGoalId;
+  t.autoSave = cleanPlan(st.autoSave).filter((p) => s.goals.some((g) => g.id === p.goalId));
+  if (st.payMode === 'irregular') t.payMode = 'irregular';
   if (Number.isSafeInteger(st.hourlyRateCents) && st.hourlyRateCents > 0) t.hourlyRateCents = st.hourlyRateCents;
   if (typeof st.adviceOn === 'boolean') t.adviceOn = st.adviceOn;
   if (Number.isInteger(st.eventHour) && st.eventHour >= 0 && st.eventHour <= 23) t.eventHour = st.eventHour;
@@ -196,7 +220,7 @@ export function newId() {
 // Every saved copy of your data carries a version number. When an update changes how data is
 // saved, it adds a step here that converts the old format to the new one, and before any
 // conversion an exact copy of the old data is kept inside the app so it can be restored.
-export const DATA_VERSION = 3;
+export const DATA_VERSION = 4;
 
 const MIGRATIONS = {
   // v1 (Stage 1): only entries, categories and two settings. Everything added later starts empty.
@@ -204,6 +228,25 @@ const MIGRATIONS = {
   // v3 adds refunds (a new kind of entry). Existing entries don't change; the version marks
   // that this data may hold refunds, and the step before it keeps a copy of the v2 data.
   2: (raw) => ({ ...raw, version: 3 }),
+  // v4: auto-save can split across several goals. The one goal + percentage becomes a list,
+  // and each past paycheck remembers the split it was saved with.
+  3: (raw) => {
+    const settings = { ...(raw.settings ?? {}) };
+    if (!Array.isArray(settings.autoSave)) {
+      settings.autoSave = settings.autoSaveBp > 0 && settings.autoSaveGoalId ? [{ goalId: settings.autoSaveGoalId, bp: settings.autoSaveBp }] : [];
+    }
+    delete settings.autoSaveBp;
+    delete settings.autoSaveGoalId;
+    const entries = Array.isArray(raw.entries) ? raw.entries : [];
+    const plans = new Map();
+    for (const e of entries) {
+      if (e?.type === 'saving' && e.parentId && e.goalId) plans.set(e.parentId, [...(plans.get(e.parentId) ?? []), { goalId: e.goalId, bp: e.bp ?? 0 }]);
+    }
+    return {
+      ...raw, version: 4, settings,
+      entries: entries.map((e) => (plans.has(e?.id) && !Array.isArray(e.autoSave) ? { ...e, autoSave: plans.get(e.id) } : e)),
+    };
+  },
 };
 
 export function savedVersion(raw) {

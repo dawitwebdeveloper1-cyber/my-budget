@@ -12,8 +12,7 @@ const id = () => `id${++n}`;
 function setup() {
   const s = freshState();
   s.goals.push({ id: 'g1', name: 'New shoes', targetCents: 15000 });
-  s.settings.autoSaveBp = 1000;
-  s.settings.autoSaveGoalId = 'g1';
+  s.settings.autoSave = [{ goalId: 'g1', bp: 1000 }];
   return s;
 }
 
@@ -44,7 +43,7 @@ test('editing a paycheck amount updates its savings; deleting removes both', () 
   addEntry(s, p, id);
   updateEntry(s, { ...p, cents: 90000 }, id);
   assert.equal(s.entries.find((e) => e.type === 'saving').cents, 9000);
-  s.settings.autoSaveBp = 2000; // changing the setting later doesn't rewrite past paychecks
+  s.settings.autoSave = [{ goalId: 'g1', bp: 2000 }]; // changing the setting later doesn't rewrite past paychecks
   updateEntry(s, { ...p, cents: 90000, name: 'Pay' }, id);
   assert.equal(s.entries.find((e) => e.type === 'saving').cents, 9000);
   deleteEntry(s, p.id);

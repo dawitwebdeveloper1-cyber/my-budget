@@ -14,6 +14,8 @@ import { openPasscodeSetup, openChangePasscode, openNewRecoveryKey } from '../lo
 import { openRuleSheet } from '../views/reminders.js';
 import { openEntrySheet } from './entry.js';
 import { openImport } from './import.js';
+import { openPaySetup } from './paysetup.js';
+import { payRule } from '../pay.js';
 import { addToCalendar } from '../calendar.js';
 
 const pad = (n) => String(n).padStart(2, '0');
@@ -70,13 +72,12 @@ export function openSettings(openSection = null, from = null) {
   function money() {
     const s = app.state;
     const st = s.settings;
-    const pay = activeRules(s).find((r) => r.kind === 'paycheck');
-    const payLine = pay
-      ? h('button', { class: 'row', onClick: () => openRuleSheet(pay) },
-        h('span', { class: 'name' }, h('span', {}, `${formatCents(pay.cents)} · ${FREQS[pay.freq]}`)),
-        h('span', { class: 'faint small' }, `next ${formatDate(nextOccurrence(pay), { weekday: true })}`))
-      : h('button', { class: 'row', onClick: () => openEntrySheet(null, { type: 'income', category: PAYCHECK, name: 'Paycheck', repeats: 'biweekly', time: `${pad(st.eventHour)}:00`, timeTouched: false }) },
-        h('span', { class: 'name' }, h('span', {}, 'Set up your regular paycheck')), icon('right'));
+    const pay = payRule(s);
+    const payLine = h('button', { class: 'row', onClick: () => openPaySetup() },
+      h('span', { class: 'name' }, h('span', {}, st.payMode === 'irregular' ? 'Irregular (changes each time)'
+        : pay ? `${formatCents(pay.cents)} · ${FREQS[pay.freq]}` : 'Set up your pay schedule')),
+      pay ? h('span', { class: 'faint small' }, `next ${formatDate(nextOccurrence(pay), { weekday: true })}`) : null,
+      icon('right'));
 
     const catList = (kind, title) => h('div', { class: 'field' }, h('span', {}, title),
       h('div', { class: 'rows' }, s.categories[kind].map((c) => h('button', { class: 'row', onClick: () => openCategory(kind, c) },
@@ -85,22 +86,28 @@ export function openSettings(openSection = null, from = null) {
         icon('right')))),
       h('button', { class: 'add-line', onClick: () => openCategory(kind, null) }, icon('plus'), 'Add a category'));
 
-    // Auto-save
-    let pct = st.autoSaveBp ? formatPercent(st.autoSaveBp).replace('%', '') : '';
-    let goalId = st.autoSaveGoalId ?? s.goals[0]?.id ?? null;
+    // Auto-save: each goal gets its own percentage of every paycheck.
+    const plan = new Map((st.autoSave ?? []).map((p) => [p.goalId, p.bp]));
+    const pcts = new Map(s.goals.map((g) => [g.id, plan.get(g.id) ? formatPercent(plan.get(g.id)).replace('%', '') : '']));
     const autoErr = h('p', { class: 'error' });
     const auto = s.goals.length
       ? h('div', { class: 'field' }, h('span', {}, 'Auto-save from each paycheck'),
-        h('div', { class: 'inline' },
-          h('div', { class: 'pct-input', style: null }, h('input', { class: 'input', inputmode: 'decimal', placeholder: '0', value: pct, onInput: (e) => { pct = e.target.value; } }), h('span', { class: 'cur-r' }, '%')),
-          h('span', { class: 'dim' }, 'to'),
-          h('div', { class: 'grow' }, select(s.goals.map((g) => [g.id, g.name]), goalId, (v) => { goalId = v; }, 'Goal'))),
+        h('div', { class: 'rows auto-rows' }, s.goals.map((g) => h('div', { class: 'set-line' },
+          h('div', { class: 'set-text' }, g.name),
+          h('div', { class: 'pct-input' }, h('input', { class: 'input', inputmode: 'decimal', placeholder: '0', 'aria-label': `Percent to ${g.name}`, value: pcts.get(g.id), onInput: (e) => { pcts.set(g.id, e.target.value); } }), h('span', { class: 'cur-r' }, '%'))))),
+        h('p', { class: 'faint small-note' }, 'Each goal gets its share of every paycheck. Leftover cents from rounding go to the first goal.'),
         autoErr,
         h('button', { class: 'btn ghost', onClick: () => {
-          const bp = parsePercent(pct || '0');
-          if (bp === null) { autoErr.textContent = 'Enter a percentage from 0 to 100'; return; }
-          change((x) => { x.settings.autoSaveBp = bp; x.settings.autoSaveGoalId = bp ? goalId : null; }, null);
-          saved(bp ? `Auto-save: ${formatPercent(bp)} of each paycheck` : 'Auto-save off');
+          const next = [];
+          for (const g of s.goals) {
+            const bp = parsePercent(pcts.get(g.id) || '0');
+            if (bp === null) { autoErr.textContent = `Enter a percentage for ${g.name}, like 10`; return; }
+            if (bp > 0) next.push({ goalId: g.id, bp });
+          }
+          const total = next.reduce((a, p) => a + p.bp, 0);
+          if (total > 10000) { autoErr.textContent = `That adds up to ${formatPercent(total)}. Keep it at 100% or less.`; return; }
+          change((x) => { x.settings.autoSave = next; }, null);
+          saved(total ? `Auto-save: ${formatPercent(total)} of each paycheck` : 'Auto-save off');
           redraw();
         } }, 'Save auto-save'))
       : h('div', { class: 'field' }, h('span', {}, 'Auto-save from each paycheck'), h('p', { class: 'faint small-note' }, 'Create a savings goal in the Goals tab first.'));

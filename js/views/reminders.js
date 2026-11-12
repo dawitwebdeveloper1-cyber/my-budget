@@ -2,7 +2,7 @@ import { h, icon, openSheet } from '../ui.js';
 import { app, change, newId } from '../state.js';
 import { parseAmount, formatCents, centsToInput } from '../money.js';
 import { nowStamp, isStamp, formatDate, formatDateTime } from '../dates.js';
-import { FREQS, KINDS, nextOccurrence, upcoming, alertText } from '../recurring.js';
+import { FREQS, KINDS, REPEAT_CHOICES, nextOccurrence, upcoming, alertText } from '../recurring.js';
 import { activeRules, editRule, stopRule } from '../ops.js';
 import { money, emptyState } from '../components.js';
 import { addToCalendar } from '../calendar.js';
@@ -78,7 +78,9 @@ export function openRuleSheet(rule, from = null) {
       h('label', { class: 'field' }, h('span', {}, 'Name'), h('input', { class: 'input', maxlength: 80, value: d.name, onInput: (e) => { d.name = e.target.value; } })),
       errors.name ? h('p', { class: 'error' }, errors.name) : null,
       h('div', { class: 'field' }, h('span', {}, 'Category'), chips('Category', cats.map((c) => [c, c]), d.category, (v) => { d.category = v; })),
-      h('div', { class: 'field' }, h('span', {}, 'Repeats'), chips('Repeats', Object.entries(FREQS), d.freq, (v) => { d.freq = v; })),
+      rule.freq === 'semimonthly'
+        ? h('p', { class: 'faint small-note' }, 'Twice a month. Change the days from Settings → Money → Your pay.')
+        : h('div', { class: 'field' }, h('span', {}, 'Repeats'), chips('Repeats', REPEAT_CHOICES, d.freq, (v) => { d.freq = v; })),
       h('div', { class: 'two' },
         h('label', { class: 'field' }, h('span', {}, 'Next date'), h('input', { class: 'input', type: 'date', value: d.date, onInput: (e) => { d.date = e.target.value; } })),
         h('label', { class: 'field' }, h('span', {}, 'Time'), h('input', { class: 'input', type: 'time', value: d.time, onInput: (e) => { d.time = e.target.value; } }))),

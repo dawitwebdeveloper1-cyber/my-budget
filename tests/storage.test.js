@@ -34,8 +34,7 @@ function sampleState() {
   s.goals.push({ id: 'g', name: 'Car', targetCents: 200000, createdAt: '' });
   s.limits.Groceries = 40000;
   s.recurring.push({ id: 'r', type: 'expense', kind: 'bill', name: 'Rent', cents: 110000, category: 'Housing', freq: 'monthly', anchor: '2026-12-01T09:00', nextIndex: 0, endAt: null });
-  s.settings.autoSaveBp = 1000;
-  s.settings.autoSaveGoalId = 'g';
+  s.settings.autoSave = [{ goalId: 'g', bp: 1000 }];
   return s;
 }
 
@@ -105,12 +104,30 @@ test('old data converts to the current version, with a copy kept first', async (
   assert.equal(copies[0].data, STAGE1, 'exact copy of the old data');
 });
 
-test('today\'s data (version 2) updates to version 3 with a restorable copy', async () => {
+test('version 3 data: one-goal auto-save becomes the new per-goal list, past paychecks keep their split', () => {
+  const v3 = {
+    version: 3,
+    goals: [{ id: 'g', name: 'Car', targetCents: 100000 }],
+    settings: { autoSaveBp: 1000, autoSaveGoalId: 'g' },
+    entries: [
+      { id: 'p', type: 'income', name: 'Paycheck', cents: 80000, at: '2026-11-06T09:00', category: 'Paycheck', note: '' },
+      { id: 's', type: 'saving', name: 'To Car', cents: 8000, at: '2026-11-06T09:00', category: 'Savings', note: '', goalId: 'g', parentId: 'p', bp: 1000 },
+    ],
+  };
+  const s = fromSaved(v3);
+  assert.equal(s.version, 4);
+  assert.deepEqual(s.settings.autoSave, [{ goalId: 'g', bp: 1000 }]);
+  assert.ok(!('autoSaveBp' in s.settings));
+  assert.deepEqual(s.entries.find((e) => e.id === 'p').autoSave, [{ goalId: 'g', bp: 1000 }]);
+  assert.equal(s.entries.find((e) => e.id === 's').cents, 8000, 'saved amounts untouched');
+});
+
+test('today\'s data (version 2) updates to the current version with a restorable copy', async () => {
   const v2 = JSON.stringify({ version: 2, entries: [{ id: 'a', type: 'expense', name: 'Lunch', cents: 1200, at: '2026-11-08T12:00', category: 'Eating Out', note: '' }], goals: [], recurring: [] });
   const device = new Map([['mybudget.v1', v2]]);
   await initStorage({ backend: memoryBackend(device), legacy: null });
   const s = load();
-  assert.equal(s.version, 3);
+  assert.equal(s.version, DATA_VERSION);
   assert.equal(s.entries[0].cents, 1200);
   assert.equal(listCopies()[0].fromVersion, 2);
   assert.equal(listCopies()[0].data, v2);
@@ -156,9 +173,9 @@ test('unreadable saved data is kept as a copy, never silently thrown away', asyn
 test('every version converts step by step', () => {
   assert.equal(savedVersion({}), 1);
   assert.equal(savedVersion({ version: 2 }), 2);
-  assert.equal(DATA_VERSION, 3);
+  assert.equal(DATA_VERSION, 4);
   assert.equal(upgradeRaw({ entries: [] }).version, DATA_VERSION);
-  assert.equal(upgradeRaw({ version: 2, entries: [] }).version, 3);
+  assert.equal(upgradeRaw({ version: 2, entries: [] }).version, 4);
   assert.equal(freshState().version, DATA_VERSION, 'new data starts at the current version');
   assert.equal(fromSaved(JSON.parse(STAGE1)).entries.length, 2);
 });

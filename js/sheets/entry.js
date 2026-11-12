@@ -4,8 +4,8 @@ import { app, change, newId } from '../state.js';
 import { parseAmount, formatCents, centsToInput } from '../money.js';
 import { nowStamp, isStamp, formatDateTime } from '../dates.js';
 import { signed } from '../calc.js';
-import { parseHours, formatHours, hoursPay, autoSaveSplit, formatPercent } from '../budget.js';
-import { FREQS, alertText } from '../recurring.js';
+import { parseHours, formatHours, hoursPay, splitAcrossGoals, formatPercent } from '../budget.js';
+import { FREQS, REPEAT_CHOICES, alertText } from '../recurring.js';
 import { addEntry, updateEntry, deleteEntry, addRule, editFuture, deleteFuture, PAYCHECK } from '../ops.js';
 import { cleanEntry, cleanRule } from '../store.js';
 import { receiptBody, openReceipt, howButton } from '../components.js';
@@ -97,7 +97,7 @@ export function openEntrySheet(existing = null, preset = {}, { from = null, acti
       h('div', { class: 'field' }, h('span', {}, d.type === 'refund' ? 'Goes back into' : 'Category'),
         chipGroup('Category', cats.map((c) => [c, c]), d.category, (c) => { d.category = c; redraw(); })),
       !existing && d.type !== 'refund' ? h('div', { class: 'field' }, h('span', {}, 'Repeats'),
-        chipGroup('Repeats', [['never', 'Never'], ...Object.entries(FREQS)], d.repeats, setRepeats)) : null,
+        chipGroup('Repeats', [['never', 'Never'], ...REPEAT_CHOICES], d.repeats, setRepeats)) : null,
       !existing && d.repeats !== 'never' && d.type === 'expense' ? h('div', { class: 'field' }, h('span', {}, 'This is a'),
         chipGroup('Kind', [['bill', 'Bill'], ['subscription', 'Subscription']], d.kind, (k) => { d.kind = k; redraw(); })) : null,
       rule ? h('p', { class: 'faint small-note' }, `Repeats ${FREQS[rule.freq].toLowerCase()}. Changes can apply to just this one or all future ones.`) : null,
@@ -151,12 +151,12 @@ export function openEntrySheet(existing = null, preset = {}, { from = null, acti
 
   function splitPreview(entry) {
     if (!(entry.type === 'income' && entry.category === PAYCHECK)) return null;
-    const linked = existing && s.entries.find((e) => e.parentId === existing.id);
-    const bp = linked ? linked.bp : s.settings.autoSaveBp;
-    const goal = s.goals.find((g) => g.id === (linked ? linked.goalId : s.settings.autoSaveGoalId));
-    if (!bp || !goal) return null;
-    const split = autoSaveSplit(entry.cents, bp, goal.name);
-    return h('div', { class: 'split' }, receiptBody(split));
+    // The split this paycheck was saved with, or today's auto-save settings for a new one.
+    const plan = (Array.isArray(existing?.autoSave) ? existing.autoSave : s.settings.autoSave ?? [])
+      .map((p) => ({ ...p, name: s.goals.find((g) => g.id === p.goalId)?.name })).filter((p) => p.name && p.bp > 0);
+    if (!plan.length) return null;
+    const split = splitAcrossGoals(entry.cents, plan);
+    return split.ok ? h('div', { class: 'split' }, receiptBody(split)) : null;
   }
 
   // Typed entries save right away (with Undo). Only a repeating item asks which ones to change.
