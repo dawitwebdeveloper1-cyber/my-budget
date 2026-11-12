@@ -2,6 +2,7 @@
 
 import { generateDue, nextOccurrence } from './recurring.js';
 import { autoSaveSplit } from './budget.js';
+import { rememberMerchant } from './suggest.js';
 
 export const PAYCHECK = 'Paycheck';
 export const isPaycheck = (e) => e.type === 'income' && e.category === PAYCHECK;
@@ -24,6 +25,28 @@ export function addEntry(state, entry, newId) {
   state.entries.push(entry);
   const s = savingFor(state, entry, newId);
   if (s) state.entries.push(s);
+  if (!entry.auto && entry.type !== 'saving') rememberMerchant(state, entry.name, entry.category, entry.type);
+}
+
+// Quick add: only the amount and category are needed. Without a name, the category is used.
+export function quickEntry({ type = 'expense', cents, category, name = '', note = '', at, newId }) {
+  return {
+    id: newId(), type, cents, at, category,
+    name: name.trim() || category,
+    note: note.trim(),
+    createdAt: new Date().toISOString(),
+  };
+}
+
+// "Repeat": the same entry again, dated now.
+export function repeatEntry(state, entry, now, newId) {
+  const copy = {
+    id: newId(), type: entry.type, name: entry.name, cents: entry.cents, at: now,
+    category: entry.category, note: entry.note ?? '', createdAt: new Date().toISOString(),
+    ...(entry.hours ? { hours: entry.hours, rateCents: entry.rateCents } : {}),
+  };
+  addEntry(state, copy, newId);
+  return copy;
 }
 
 export function updateEntry(state, entry, newId) {
@@ -31,6 +54,8 @@ export function updateEntry(state, entry, newId) {
   if (i < 0) return;
   const was = state.entries[i];
   state.entries[i] = entry;
+  // Changing a store's category teaches merchant memory the new one.
+  if (entry.type !== 'saving') rememberMerchant(state, entry.name, entry.category, entry.type);
   const linked = state.entries.find((e) => e.parentId === entry.id);
   if (linked) {
     const goal = state.goals.find((g) => g.id === linked.goalId);

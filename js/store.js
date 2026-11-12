@@ -38,6 +38,8 @@ export function freshState() {
     adjustments: [],
     notice: [],           // entry ids added automatically since the last visit
     celebrated: [],       // goals that have had their confetti
+    favourites: [],       // one-tap entries, like "Bus pass $3.30"
+    merchants: {},        // merchant memory: "expense:tim hortons" → "Eating Out"
     dismissedAdvice: [],
     categories: structuredClone(DEFAULT_CATEGORIES),
     settings: { ...DEFAULT_SETTINGS },
@@ -137,6 +139,17 @@ export function cleanState(raw) {
   }
   // Older saved data has no list yet: null means "note reached goals quietly, no confetti".
   s.celebrated = Array.isArray(raw.celebrated) ? raw.celebrated.filter((x) => typeof x === 'string').slice(0, 500) : null;
+  if (Array.isArray(raw.favourites)) {
+    s.favourites = raw.favourites
+      .filter((f) => f && (f.type === 'income' || f.type === 'expense') && cents(f.cents) && typeof f.category === 'string' && str(f.name, 80).trim())
+      .slice(0, 12)
+      .map((f) => ({ id: str(f.id, 64) || newId(), type: f.type, name: str(f.name, 80).trim(), cents: f.cents, category: str(f.category, 40) }));
+  }
+  if (raw.merchants && typeof raw.merchants === 'object') {
+    for (const [k, v] of Object.entries(raw.merchants).slice(0, 500)) {
+      if (typeof v === 'string' && /^(expense|income):/.test(k)) s.merchants[str(k, 100)] = str(v, 40);
+    }
+  }
   if (Array.isArray(raw.notice)) s.notice = raw.notice.filter((x) => typeof x === 'string').slice(0, 500);
   if (Array.isArray(raw.dismissedAdvice)) s.dismissedAdvice = raw.dismissedAdvice.filter((x) => typeof x === 'string').slice(-200);
 

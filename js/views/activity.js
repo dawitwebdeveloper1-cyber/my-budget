@@ -1,5 +1,8 @@
-import { h, icon, onHold, holdMenu } from '../ui.js';
-import { app } from '../state.js';
+import { h, icon, onHold, holdMenu, toast } from '../ui.js';
+import { app, change, newId } from '../state.js';
+import { repeatEntry } from '../ops.js';
+import { isFavourite, addFavourite, removeFavourite, MAX_FAVOURITES } from '../suggest.js';
+import { nowStamp } from '../dates.js';
 import { formatCents, centsToInput } from '../money.js';
 import { formatHours } from '../budget.js';
 import { budgetMonth, shiftBudgetMonth, weekOf, shiftWeek, dayOf, shiftDay, inPeriod, formatDate, formatTime, formatDateTime, dayKey } from '../dates.js';
@@ -107,9 +110,17 @@ export function entryRow(e, now) {
   // Press and hold: Edit, Duplicate, Delete
   onHold(el, () => {
     const auto = e.type === 'saving' && e.parentId;
+    const isMoney = e.type !== 'saving';
+    const fav = isMoney && isFavourite(app.state, e);
+    const full = (app.state.favourites ?? []).length >= MAX_FAVOURITES;
     holdMenu(el, [
       { label: 'Edit', icon: 'edit', run: () => openEntrySheet(e) },
-      e.type !== 'saving' ? { label: 'Duplicate', icon: 'copy', run: () => openEntrySheet(null, duplicateOf(e)) } : null,
+      // Repeat: the same entry again, today, saved straight away (with Undo)
+      isMoney ? { label: 'Repeat today', icon: 'repeat', run: () => change((st) => repeatEntry(st, e, nowStamp(), newId), `Repeated ${e.name} ${formatCents(signed(e), { sign: 'always' })}`) } : null,
+      isMoney ? { label: 'Duplicate', icon: 'copy', run: () => openEntrySheet(null, duplicateOf(e)) } : null,
+      isMoney ? (fav
+        ? { label: 'Remove from favourites', icon: 'star', run: () => change((st) => removeFavourite(st, e), 'Removed from favourites') }
+        : { label: 'Add to favourites', icon: 'star', run: () => (full ? toast(`Favourites are full (${MAX_FAVOURITES}). Remove one first.`) : change((st) => addFavourite(st, e, newId), `${e.name} is now a favourite`)) }) : null,
       !auto ? { label: 'Delete', icon: 'trash', danger: true, run: () => openEntrySheet(e, {}, { action: 'delete' }) } : null,
     ].filter(Boolean));
   });

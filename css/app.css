@@ -560,6 +560,32 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .cat-item.pre { opacity: 0; transform: translateY(6px); }
 .cat-item.go { opacity: 1; transform: none; transition: opacity .35s var(--ease), transform .35s var(--ease); }
 .ring-how { margin-top: 12px; }
+/* ---------- Quick add ---------- */
+.qa-amount { text-align: center; font-size: 46px; font-weight: 800; letter-spacing: -0.03em; margin: 8px 0 10px; min-height: 58px; }
+.qa-amount.empty { color: var(--faint); }
+.qa-name { text-align: center; margin-bottom: 12px; }
+.qa-note { margin-bottom: 10px; min-height: 60px; }
+.qa-hint { font-size: 13px; color: var(--label); text-align: center; margin-bottom: 8px; }
+.qa-cats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.qa-cat {
+  padding: 13px 6px; border-radius: 16px; background: var(--soft); font-weight: 700; font-size: 14.5px;
+  text-align: center; overflow-wrap: anywhere; min-height: 50px;
+}
+.qa-cat.known, .chip.known { outline: 2px solid var(--strong); outline-offset: -2px; }
+.qa-cat:disabled, .qa-cats-wrap .chip:disabled { opacity: .45; }
+.qa-cats-wrap { margin-bottom: 12px; text-align: center; }
+.qa-cats-wrap .chips { justify-content: center; }
+.qa-cats-wrap .link { margin-top: 4px; }
+.fav-row { display: flex; gap: 8px; overflow-x: auto; padding: 2px 2px 8px; margin: 0 -2px 4px; scrollbar-width: none; }
+.fav-row::-webkit-scrollbar { display: none; }
+.chip.fav { display: inline-flex; gap: 6px; align-items: center; white-space: nowrap; background: var(--soft); color: var(--text); }
+.chip.fav b { font-weight: 800; }
+.numpad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 4px; }
+.np-key { height: 54px; border-radius: 16px; background: var(--surface); box-shadow: var(--shadow); font-size: 24px; font-weight: 700; display: grid; place-items: center; transition: transform .15s var(--ease), background-color .2s var(--ease); }
+.np-key:active { transform: scale(0.96); background: var(--soft); }
+.np-key svg { width: 22px; height: 22px; }
+.qa-links { display: flex; justify-content: space-between; margin-top: 10px; }
+
 .steps { margin: 14px 0; padding-left: 22px; line-height: 1.5; }
 .steps li { margin: 8px 0; }
 @media (max-width: 345px) { .ring-row { grid-template-columns: 1fr; justify-items: center; } .cat-list { width: 100%; } }

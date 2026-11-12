@@ -102,7 +102,7 @@ export function openEntrySheet(existing = null, preset = {}, { from = null, acti
         ? h('label', { class: 'field' }, h('span', {}, 'Note'), h('textarea', { class: 'input', maxlength: 500, onInput: (ev) => { d.note = ev.target.value; } }, d.note))
         : h('button', { class: 'link', onClick: () => { d.showNote = true; redraw(); } }, 'Add a note'),
       h('div', { class: 'actions' },
-        h('button', { class: 'btn primary', onClick: review }, 'Review'),
+        h('button', { class: 'btn primary', onClick: saveNow }, existing ? 'Save changes' : 'Save'),
         existing ? h('button', { class: 'btn danger', onClick: confirmDelete }, 'Delete entry') : null),
     ];
   }
@@ -152,13 +152,19 @@ export function openEntrySheet(existing = null, preset = {}, { from = null, acti
     return h('div', { class: 'split' }, receiptBody(split));
   }
 
-  function review() {
+  // Typed entries save right away (with Undo). Only a repeating item asks which ones to change.
+  function saveNow() {
     const entry = build();
     if (!entry) { redraw(); return; }
+    if (rule) review(entry);
+    else commit(entry);
+  }
+
+  function review(entry) {
     const kind = entry.type === 'income' ? 'in' : 'out';
     const future = entry.at > nowStamp();
     const repeating = !existing && d.repeats !== 'never';
-    sheet.setTitle(existing ? 'Save changes?' : 'Add this?');
+    sheet.setTitle('Change which ones?');
     const buttons = rule
       ? [h('button', { class: 'btn primary', onClick: () => commit(entry, 'one') }, 'Save just this one'),
         h('button', { class: 'btn ghost', onClick: () => commit(entry, 'future') }, 'Save this and all future ones')]
@@ -194,7 +200,8 @@ export function openEntrySheet(existing = null, preset = {}, { from = null, acti
       return;
     }
     if (d.repeats === 'never') {
-      change((st) => { rememberRate(st); addEntry(st, entry, newId); }, 'Saved');
+      change((st) => { rememberRate(st); addEntry(st, entry, newId); },
+        entry.at > now ? `Saved. Counts from ${formatDateTime(entry.at)}` : `Saved ${formatCents(signed(entry), { sign: 'always' })} · ${entry.category}`);
       sheet.close();
       return;
     }

@@ -12,7 +12,7 @@ import { renderHome } from './views/home.js';
 import { renderActivity } from './views/activity.js';
 import { renderGoals } from './views/goals.js';
 import { renderReminders } from './views/reminders.js';
-import { openEntrySheet } from './sheets/entry.js';
+import { openQuickAdd } from './sheets/quick.js';
 import { openWelcome } from './sheets/welcome.js';
 import { openSettings } from './sheets/settings.js';
 
@@ -49,7 +49,7 @@ function render(animate = false) {
           h('h1', {}, TABS.find((t) => t[0] === v.tab)[1])),
         h('button', { class: 'round-btn', 'aria-label': 'Settings', onClick: (e) => openSettings(null, e.currentTarget) }, icon('gear'))),
       screenEl),
-    h('button', { class: 'fab', 'aria-label': 'Add an entry', onClick: () => openEntrySheet() }, icon('plus')),
+    h('button', { class: 'fab', 'aria-label': 'Add an entry', onClick: () => openQuickAdd() }, icon('plus')),
     h('div', { class: 'tabbar' },
       h('nav', { 'aria-label': 'Tabs' }, TABS.map(([id, label, ic]) =>
         h('button', {
