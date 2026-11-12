@@ -1,7 +1,7 @@
 // Lets the app open with no internet. Only caches the app's own files – never your data.
 // Network first, so updates published to GitHub show up the next time you open the app online.
 
-const CACHE = 'my-budget-v12';
+const CACHE = 'my-budget-v14';
 const FILES = [
   './',
   './index.html',
@@ -31,6 +31,8 @@ const FILES = [
   './js/suggest.js',
   './js/voice.js',
   './js/receipt.js',
+  './js/bankimport.js',
+  './js/sheets/import.js',
   './js/scan.js',
   // (the scanner's own files in vendor/tesseract are saved for offline the first time it's used)
   './js/sheets/quick.js',

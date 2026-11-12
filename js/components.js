@@ -88,7 +88,7 @@ export function receiptBody(result) {
 function ratioReceipt(result) {
   const r = result.receipt;
   const okParts = result.ok && receiptMatches(r.spentReceipt, r.spent) && receiptMatches(r.baseReceipt, r.base)
-    && Math.floor((r.spent * 100) / r.base) === r.percent;
+    && Math.floor((Math.max(0, r.spent) * 100) / r.base) === r.percent;
   if (!okParts) return h('p', { class: 'unverified' }, UNVERIFIED);
   const exactText = `${Math.floor(r.exact / 100)}.${String(r.exact % 100).padStart(2, '0')}%`;
   const line = (l, v) => h('div', { class: 'r-line' }, h('div', { class: 'l' }, l), h('div', { class: 'r' }, v));

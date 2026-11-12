@@ -59,8 +59,12 @@ export function openEntrySheet(existing = null, preset = {}, { from = null, acti
   }
 
   function form() {
-    const cats = s.categories[d.type];
+    // A refund goes back into a spending category.
+    const cats = s.categories[d.type === 'refund' ? 'expense' : d.type];
     if (!cats.includes(d.category)) d.category = cats[0];
+    if (d.type === 'refund') d.repeats = 'never';
+    const refundBox = h('input', { type: 'checkbox', id: 'is-refund', checked: d.type === 'refund' });
+    refundBox.addEventListener('change', () => { d.type = refundBox.checked ? 'refund' : 'income'; redraw(); });
     const field = (label, input, err) => [h('label', { class: 'field' }, h('span', {}, label), input), errors[err] ? h('p', { class: 'error' }, errors[err]) : null];
     const input = (key, { live, ...attrs } = {}) => h('input', { class: 'input', value: d[key], autocomplete: 'off', ...attrs, onInput: (ev) => { d[key] = ev.target.value; if (key === 'time' || key === 'date') d.timeTouched = true; live?.(); } });
 
@@ -80,16 +84,19 @@ export function openEntrySheet(existing = null, preset = {}, { from = null, acti
 
     return [
       h('div', { class: 'seg', role: 'group', 'aria-label': 'Money in or out' },
-        h('button', { 'aria-pressed': String(d.type === 'income'), onClick: () => { d.type = 'income'; redraw(); } }, 'Money in'),
+        h('button', { 'aria-pressed': String(d.type === 'income' || d.type === 'refund'), onClick: () => { if (d.type !== 'refund') d.type = 'income'; redraw(); } }, 'Money in'),
         h('button', { 'aria-pressed': String(d.type === 'expense'), onClick: () => { d.type = 'expense'; redraw(); } }, 'Money out')),
+      d.type === 'income' || d.type === 'refund'
+        ? h('label', { class: 'check refund-check', for: 'is-refund' }, refundBox, h('span', {}, "It's a refund (money back for something I bought)"))
+        : null,
       isPay() ? h('div', { class: 'seg small', role: 'group', 'aria-label': 'How to enter the paycheck' },
         h('button', { 'aria-pressed': String(d.payMode === 'amount'), onClick: () => { d.payMode = 'amount'; redraw(); } }, 'Amount'),
         h('button', { 'aria-pressed': String(d.payMode === 'hours'), onClick: () => { d.payMode = 'hours'; redraw(); } }, 'Hours × pay')) : null,
       amountBlock,
-      field('Name', input('name', { maxlength: 80, placeholder: d.type === 'income' ? 'e.g. Paycheck' : 'e.g. Groceries at No Frills' }), 'name'),
-      h('div', { class: 'field' }, h('span', {}, 'Category'),
+      field('Name', input('name', { maxlength: 80, placeholder: d.type === 'income' ? 'e.g. Paycheck' : d.type === 'refund' ? 'e.g. Walmart return' : 'e.g. Groceries at No Frills' }), 'name'),
+      h('div', { class: 'field' }, h('span', {}, d.type === 'refund' ? 'Goes back into' : 'Category'),
         chipGroup('Category', cats.map((c) => [c, c]), d.category, (c) => { d.category = c; redraw(); })),
-      !existing ? h('div', { class: 'field' }, h('span', {}, 'Repeats'),
+      !existing && d.type !== 'refund' ? h('div', { class: 'field' }, h('span', {}, 'Repeats'),
         chipGroup('Repeats', [['never', 'Never'], ...Object.entries(FREQS)], d.repeats, setRepeats)) : null,
       !existing && d.repeats !== 'never' && d.type === 'expense' ? h('div', { class: 'field' }, h('span', {}, 'This is a'),
         chipGroup('Kind', [['bill', 'Bill'], ['subscription', 'Subscription']], d.kind, (k) => { d.kind = k; redraw(); })) : null,
@@ -161,7 +168,7 @@ export function openEntrySheet(existing = null, preset = {}, { from = null, acti
   }
 
   function review(entry) {
-    const kind = entry.type === 'income' ? 'in' : 'out';
+    const kind = entry.type === 'income' || entry.type === 'refund' ? 'in' : 'out';
     const future = entry.at > nowStamp();
     const repeating = !existing && d.repeats !== 'never';
     sheet.setTitle('Change which ones?');
@@ -201,7 +208,9 @@ export function openEntrySheet(existing = null, preset = {}, { from = null, acti
     }
     if (d.repeats === 'never') {
       change((st) => { rememberRate(st); addEntry(st, entry, newId); },
-        entry.at > now ? `Saved. Counts from ${formatDateTime(entry.at)}` : `Saved ${formatCents(signed(entry), { sign: 'always' })} · ${entry.category}`);
+        entry.at > now ? `Saved. Counts from ${formatDateTime(entry.at)}`
+          : entry.type === 'refund' ? `Refund ${formatCents(entry.cents, { sign: 'always' })} back into ${entry.category}`
+            : `Saved ${formatCents(signed(entry), { sign: 'always' })} · ${entry.category}`);
       sheet.close();
       return;
     }
@@ -226,7 +235,7 @@ export function openEntrySheet(existing = null, preset = {}, { from = null, acti
 
   function confirmDelete() {
     sheet.setTitle('Delete this entry?');
-    const kind = existing.type === 'income' ? 'in' : 'out';
+    const kind = existing.type === 'income' || existing.type === 'refund' ? 'in' : 'out';
     const card = h('div', { class: 'confirm-card' },
       h('div', { class: `big num ${kind}` }, icon(kind === 'in' ? 'up' : 'down', 'arrow'), formatCents(signed(existing), { sign: 'always' })),
       h('div', { class: 'what' }, existing.name),

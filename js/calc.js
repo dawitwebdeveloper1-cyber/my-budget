@@ -9,13 +9,23 @@
 import { assertCents, sumCents } from './money.js';
 import { budgetMonth, shiftBudgetMonth, inPeriod } from './dates.js';
 
-export const TYPES = ['income', 'expense', 'saving'];
+// A refund is money back for something you bought: it goes back into that purchase's
+// category (less spending there) and is never counted as income.
+export const TYPES = ['income', 'expense', 'saving', 'refund'];
 
 export function signed(e) {
-  if (e.type === 'income') return e.cents;
+  if (e.type === 'income' || e.type === 'refund') return e.cents;
   if (e.type === 'expense' || e.type === 'saving') return -e.cents;
   throw new Error(`Unknown entry type: ${e.type}`);
 }
+
+// Spending counts purchases up and refunds down.
+export function spendCents(e) {
+  if (e.type === 'expense') return e.cents;
+  if (e.type === 'refund') return -e.cents;
+  return 0;
+}
+export const isSpending = (e) => e.type === 'expense' || e.type === 'refund';
 
 const byTime = (a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0);
 
@@ -35,7 +45,7 @@ export function receiptMatches(receipt, value) {
 }
 
 function entryLine(e) {
-  return { label: e.name, at: e.at, cents: signed(e), type: e.type, category: e.category };
+  return { label: e.type === 'refund' ? `Refund: ${e.name}` : e.name, at: e.at, cents: signed(e), type: e.type, category: e.category };
 }
 
 function finish(result, receipt) {
@@ -51,7 +61,9 @@ export function periodTotals(entries, period, now) {
   // ---- Way A: filter, then add up each kind separately
   const live = entries.filter((e) => e.at <= now && inPeriod(e.at, period)).sort(byTime);
   const inA = sumCents(live.filter((e) => e.type === 'income').map((e) => e.cents));
-  const outA = sumCents(live.filter((e) => e.type === 'expense').map((e) => e.cents));
+  // money out = purchases minus refunds
+  const outA = sumCents(live.filter((e) => e.type === 'expense').map((e) => e.cents))
+    - sumCents(live.filter((e) => e.type === 'refund').map((e) => e.cents));
   const savedA = sumCents(live.filter((e) => e.type === 'saving').map((e) => e.cents));
   const netA = inA - savedA - outA;
 
@@ -69,13 +81,14 @@ export function periodTotals(entries, period, now) {
       case 'income': inB += e.cents; break;
       case 'saving': savedB += e.cents; break;
       case 'expense': groups.set(e.category, (groups.get(e.category) ?? 0) + e.cents); break;
+      case 'refund': groups.set(e.category, (groups.get(e.category) ?? 0) - e.cents); break;
       default: throw new Error(`Unknown entry type: ${e.type}`);
     }
   }
   const outB = sumCents([...groups.values()]);
 
   const incomes = live.filter((e) => e.type === 'income');
-  const expenses = live.filter((e) => e.type === 'expense');
+  const expenses = live.filter(isSpending); // purchases and their refunds
   const savings = live.filter((e) => e.type === 'saving');
 
   const moneyIn = finish(checked(inA, inB), {
@@ -97,7 +110,7 @@ export function periodTotals(entries, period, now) {
 
   // Spending by category (for the ring chart)
   const catA = new Map();
-  for (const e of expenses) catA.set(e.category, (catA.get(e.category) ?? 0) + e.cents);
+  for (const e of expenses) catA.set(e.category, (catA.get(e.category) ?? 0) + spendCents(e));
   const byCategory = [...catA.entries()]
     .map(([category, cents]) => {
       const c = finish(checked(cents, groups.get(category)), {

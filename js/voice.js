@@ -124,15 +124,21 @@ const PAY_WORDS = ['got paid', 'paycheck', 'pay cheque', 'paycheque', 'payday', 
 const EXPENSE_WORDS = ['spent', 'spend', 'paid', 'bought', 'buy', 'cost', 'costs'];
 
 // Everyday words → the default categories (only used if you have that category).
-const HINTS = {
-  'Eating Out': ['lunch', 'dinner', 'breakfast', 'coffee', 'restaurant', 'takeout', 'take out', 'pizza', 'burger', 'sushi', 'tim hortons', 'starbucks', 'mcdonalds', "mcdonald's", 'subway', 'food court', 'snack', 'snacks', 'bubble tea', 'drinks'],
-  Groceries: ['groceries', 'grocery', 'supermarket', 'no frills', 'superstore', 'safeway', 'costco', 'walmart groceries', 'sobeys', 'loblaws', 'freshco', 'food basics', 'metro'],
-  Transport: ['gas', 'bus', 'transit', 'uber', 'lyft', 'taxi', 'train', 'parking', 'fuel', 'ctrain', 'c train', 'ttc', 'bus pass'],
+export const HINTS = {
+  'Eating Out': ['lunch', 'dinner', 'breakfast', 'coffee', 'restaurant', 'resta', 'takeout', 'take out', 'pizza', 'burger', 'sushi', 'tim hortons', 'starbucks', 'mcdonalds', "mcdonald's", 'subway', 'food court', 'snack', 'snacks', 'bubble tea', 'drinks',
+    'dairy queen', 'kfc', 'a&w', 'wendy', 'burger king', 'popeyes', 'chick-fil-a', 'falafel', 'pita', 'shawarma', 'wok', 'krispy', 'krispykreme', 'donut', 'doughnut', 'cafe', 'café', 'grill', 'gri', 'bakery', 'diner', 'drive i', 'drive in', 'food ch', 'opa', 'hankki', 'chipotle', 'mary brown', 'domino', 'pizza hut', 'little caesars', 'taco', 'noodle', 'pho', 'ramen', 'kitchen',
+    '7 eleven', '7-eleven', 'macs conv', "mac's", 'circle k', 'convenience', 'canteen', 'cafeteria'],
+  Groceries: ['groceries', 'grocery', 'groc', 'supermarket', 'no frills', 'superstore', 'safeway', 'costco', 'walmart groceries', 'sobeys', 'loblaws', 'freshco', 'food basics', 'metro', 'iga', 'co-op', 'save-on', 'save on foods', 't&t', 'h mart', 'fresh'],
+  Transport: ['gas', 'bus', 'transit', 'uber', 'lyft', 'taxi', 'train', 'parking', 'fuel', 'ctrain', 'c train', 'ttc', 'bus pass',
+    'shell', 'esso', 'petro canada', 'petro-canada', 'husky', 'chevron', 'mobil', 'pioneer', 'ultramar', 'co-op gas', 'calgary transit', 'presto', 'compass', 'impark', 'indigo park',
+    'bird', 'lime', 'neuron', 'scooter', 'centex'],
   Housing: ['rent', 'mortgage'],
-  Bills: ['phone bill', 'phone', 'internet', 'hydro', 'electricity', 'bill', 'insurance', 'netflix', 'spotify', 'subscription'],
-  Shopping: ['clothes', 'shoes', 'shopping', 'amazon', 'mall', 'hoodie', 'shirt'],
-  Fun: ['movie', 'movies', 'game', 'games', 'concert', 'cinema', 'bowling', 'party'],
-  Health: ['doctor', 'dentist', 'pharmacy', 'medicine', 'shoppers', 'gym', 'vitamins'],
+  Bills: ['phone bill', 'phone', 'hydro', 'electricity', 'bill', 'insurance', 'netflix', 'spotify', 'subscription',
+    'apple.com', 'apple com', 'icloud', 'google', 'youtube', 'disney', 'crave', 'xbox', 'playstation', 'rogers', 'bell', 'telus', 'fido', 'koodo', 'freedom mobile', 'public mobile', 'shaw', 'enmax', 'atco', 'direct energy', 'service charge'],
+  Shopping: ['clothes', 'shoes', 'shopping', 'amazon', 'mall', 'hoodie', 'shirt',
+    'walmart', 'dollarama', 'dollar tree', 'winners', 'marshalls', 'homesense', 'canadian tire', 'home depot', 'rona', 'lowe', 'ikea', 'best buy', 'staples', 'indigo', 'foot locker', 'sport chek', 'sportchek', 'uniqlo', 'simons', 'lamaisonsimons', 'h&m', 'zara', 'urban planet', 'old navy', 'gap', 'shein', 'temu', 'aliexpress', 'value village', 'hypedept', 'nike', 'adidas', 'lululemon', 'aritzia', 'sephora', 'hairsense', 'beauty', 'salon', 'barber'],
+  Fun: ['movie', 'movies', 'game', 'games', 'concert', 'cinema', 'bowling', 'party', 'cineplex', 'landmark cinemas', 'steam', 'nintendo', 'ticketmaster', 'soccer', 'hockey', 'basketball', 'arcade', 'lindsay park'],
+  Health: ['doctor', 'dentist', 'pharmacy', 'medicine', 'shoppers', 'sdm', 'gym', 'vitamins', 'ymca', 'goodlife', 'fitness', 'rexall', 'london drugs', 'physio', 'clinic'],
 };
 
 const has = (text, phrase) => new RegExp(`(^|\\s)${phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(\\s|$)`).test(text);

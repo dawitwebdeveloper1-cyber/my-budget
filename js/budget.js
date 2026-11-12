@@ -2,7 +2,7 @@
 // Same rules as calc.js: whole cents, two independent ways, receipts that add up exactly.
 
 import { assertCents, sumCents, formatCents } from './money.js';
-import { checked, receiptMatches, periodTotals } from './calc.js';
+import { checked, receiptMatches, periodTotals, spendCents, isSpending } from './calc.js';
 import { weekOf, shiftWeek, parseStamp } from './dates.js';
 
 // ---------- Parsing ----------
@@ -118,14 +118,15 @@ export function categoryBudgets(state, period, now) {
   const names = [...state.categories.expense];
   for (const c of spentA.keys()) if (!names.includes(c)) names.push(c);
 
-  const live = state.entries.filter((e) => e.type === 'expense' && e.at <= now && e.at >= period.start && e.at < period.end)
+  // purchases and refunds (a refund puts money back into its category)
+  const live = state.entries.filter((e) => isSpending(e) && e.at <= now && e.at >= period.start && e.at < period.end)
     .sort((a, b) => (a.at < b.at ? -1 : 1));
 
   const rows = names.map((category) => {
     const limit = Number.isSafeInteger(limits[category]) ? limits[category] : null;
     const spentWayA = totals.categoriesOk ? (spentA.get(category) ?? 0) : NaN;
     const mine = live.filter((e) => e.category === category);
-    const spentWayB = sumCents(mine.map((e) => e.cents));
+    const spentWayB = sumCents(mine.map(spendCents));
     const spent = checked(spentWayA, spentWayB);
     if (limit === null) return { category, limit: null, spent };
 
@@ -136,7 +137,7 @@ export function categoryBudgets(state, period, now) {
       { label: `${category} limit`, cents: limit, neutral: true },
       ...adjIn.map((a) => ({ label: `Covered from ${a.from}`, cents: a.cents, neutral: true })),
       ...adjOut.map((a) => ({ label: `Moved to ${a.to}`, cents: -a.cents, neutral: true })),
-      ...mine.map((e) => ({ label: e.name, at: e.at, cents: -e.cents })),
+      ...mine.map((e) => ({ label: e.type === 'refund' ? `Refund: ${e.name}` : e.name, at: e.at, cents: -spendCents(e) })),
     ];
     // Way A: limit adjusted, minus total spent. Way B: add up every line one by one.
     const remA = spent.ok ? effective - spent.value : NaN;
@@ -157,7 +158,7 @@ export function categoryBudgets(state, period, now) {
   const allOk = limited.every((r) => r.ok);
   const totalA = allOk ? sumCents(limited.map((r) => r.value)) : NaN;
   const totalB = sumCents(limited.map((r) => r.limit))
-    - sumCents(live.filter((e) => limited.some((r) => r.category === e.category)).map((e) => e.cents));
+    - sumCents(live.filter((e) => limited.some((r) => r.category === e.category)).map(spendCents));
   const t = checked(totalA, totalB);
   const totalReceipt = {
     title: 'Whole budget', totalLabel: t.ok && t.value < 0 ? 'Over by' : 'Left to spend',
@@ -192,9 +193,9 @@ export function weeklySnapshot(entries, now, weekStart = 1) {
   let tB = 0;
   let lB = 0;
   for (const e of entries) {
-    if (e.type !== 'expense' || !(e.at <= now)) continue;
-    if (e.at >= thisWeek.start && e.at < thisWeek.end) tB += e.cents;
-    else if (e.at >= lastWeek.start && e.at < lastWeek.end) lB += e.cents;
+    if (!isSpending(e) || !(e.at <= now)) continue;
+    if (e.at >= thisWeek.start && e.at < thisWeek.end) tB += spendCents(e);
+    else if (e.at >= lastWeek.start && e.at < lastWeek.end) lB += spendCents(e);
   }
   const d = checked(thisSpent - lastSpent, tB - lB);
   const receipt = {
@@ -228,9 +229,9 @@ export function budgetProgress(state, period, now, summary) {
     spentA = b.total.limit - b.total.value;
     spentB = sumCents(limited.map((r) => r.spent.value));
     const names = new Set(limited.map((r) => r.category));
-    const items = state.entries.filter((e) => e.type === 'expense' && names.has(e.category) && e.at <= now && e.at >= period.start && e.at < period.end)
+    const items = state.entries.filter((e) => isSpending(e) && names.has(e.category) && e.at <= now && e.at >= period.start && e.at < period.end)
       .sort((a, b2) => (a.at < b2.at ? -1 : 1));
-    spentReceipt = { title: 'Spent in categories with limits', totalLabel: 'Spent so far', lines: items.map((e) => ({ label: e.name, at: e.at, category: e.category, type: 'expense', cents: e.cents, neutral: true })) };
+    spentReceipt = { title: 'Spent in categories with limits', totalLabel: 'Spent so far', lines: items.map((e) => ({ label: e.type === 'refund' ? `Refund: ${e.name}` : e.name, at: e.at, category: e.category, type: 'expense', cents: spendCents(e), neutral: true })) };
     baseReceipt = { title: 'Your budget', totalLabel: 'Total budget', lines: limited.map((r) => ({ label: `${r.category} limit`, cents: r.limit, neutral: true })) };
   } else {
     if (!summary.left.ok || !summary.moneyOut.ok || !summary.moneyIn.ok || !summary.saved.ok || !summary.carry.ok) return { ok: false };
@@ -238,7 +239,7 @@ export function budgetProgress(state, period, now, summary) {
     base = summary.carry.value + summary.moneyIn.value + summary.saved.value;
     spentA = -summary.moneyOut.value;
     spentB = 0;
-    for (const e of state.entries) if (e.type === 'expense' && e.at <= now && e.at >= period.start && e.at < period.end) spentB += e.cents;
+    for (const e of state.entries) if (e.at <= now && e.at >= period.start && e.at < period.end) spentB += spendCents(e);
     spentReceipt = { title: 'Spent this month', totalLabel: 'Spent so far', lines: (summary.moneyOut.receipt?.lines ?? []).map((l) => ({ ...l, cents: -l.cents, neutral: true })) };
     baseReceipt = { title: 'Money you had this month', totalLabel: 'Money you had', lines: [
       ...(summary.carry.value ? [{ label: `Carried over from ${summary.previousLabel}`, cents: summary.carry.value, neutral: true }] : []),
@@ -249,11 +250,13 @@ export function budgetProgress(state, period, now, summary) {
   const spent = checked(spentA, spentB);
   if (!spent.ok || base <= 0) return { ok: false, empty: base <= 0, basis };
   if (!receiptMatches(spentReceipt, spent.value) || !receiptMatches(baseReceipt, base)) return { ok: false, basis };
-  const pA = Math.floor((spent.value * 100) / base);
-  const pB = Number((BigInt(spent.value) * 100n) / BigInt(base));
+  // If refunds outweigh spending this month, nothing has been used: 0%.
+  const used = Math.max(0, spent.value);
+  const pA = Math.floor((used * 100) / base);
+  const pB = Number((BigInt(used) * 100n) / BigInt(base));
   const pct = checked(pA, pB);
   if (!pct.ok) return { ok: false, basis };
-  const exact = Number((BigInt(spent.value) * 10000n) / BigInt(base)); // hundredths of a percent
+  const exact = Number((BigInt(used) * 10000n) / BigInt(base)); // hundredths of a percent
   return {
     ok: true, basis, value: pct.value, spent: spent.value, base,
     receipt: { kind: 'ratio', title: basis === 'budget' ? "This month's budget" : 'Spent this month', spent: spent.value, base, exact, percent: pct.value, spentReceipt, baseReceipt, spentLabel: 'Spent so far', baseLabel: basis === 'budget' ? 'Your budget' : 'Money you had' },

@@ -123,10 +123,11 @@ function reference(entries, period, now) {
   for (const e of entries) {
     if (e.at > now) continue;
     const c = BigInt(e.cents);
-    if (e.at < period.start) carry += e.type === 'income' ? c : -c;
+    if (e.at < period.start) carry += e.type === 'income' || e.type === 'refund' ? c : -c;
     else if (e.at < period.end) {
       if (e.type === 'income') inn += c;
       else if (e.type === 'expense') out += c;
+      else if (e.type === 'refund') out -= c; // money back lowers spending, never counts as income
       else saved += c;
     }
   }
@@ -134,7 +135,7 @@ function reference(entries, period, now) {
 }
 
 test('randomized: 2,000 random budgets all verify and match a BigInt reference', () => {
-  const types = ['income', 'expense', 'expense', 'expense', 'saving'];
+  const types = ['income', 'expense', 'expense', 'expense', 'saving', 'refund'];
   const cats = ['Housing', 'Groceries', 'Fun', 'Bills', 'Other'];
   for (let round = 0; round < 2000; round++) {
     const count = Math.floor(Math.random() * 60);
@@ -170,5 +171,6 @@ test('signed amounts', () => {
   assert.equal(signed({ type: 'income', cents: 5 }), 5);
   assert.equal(signed({ type: 'expense', cents: 5 }), -5);
   assert.equal(signed({ type: 'saving', cents: 5 }), -5);
+  assert.equal(signed({ type: 'refund', cents: 5 }), 5);
   assert.throws(() => signed({ type: 'gift', cents: 5 }));
 });

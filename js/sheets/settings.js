@@ -13,6 +13,7 @@ import { isPersisted, flushStorage } from '../storage.js';
 import { openPasscodeSetup, openChangePasscode, openNewRecoveryKey } from '../lock.js';
 import { openRuleSheet } from '../views/reminders.js';
 import { openEntrySheet } from './entry.js';
+import { openImport } from './import.js';
 import { addToCalendar } from '../calendar.js';
 
 const pad = (n) => String(n).padStart(2, '0');
@@ -105,6 +106,9 @@ export function openSettings(openSection = null, from = null) {
       : h('div', { class: 'field' }, h('span', {}, 'Auto-save from each paycheck'), h('p', { class: 'faint small-note' }, 'Create a savings goal in the Goals tab first.'));
 
     return [
+      h('div', { class: 'field' }, h('span', {}, 'Bank file'),
+        h('div', { class: 'rows' }, h('button', { class: 'row', onClick: () => openImport() },
+          h('span', { class: 'name' }, h('span', {}, 'Import from your bank (CSV)')), icon('right')))),
       h('div', { class: 'field' }, h('span', {}, 'Your pay'), h('div', { class: 'rows' }, payLine)),
       auto,
       catList('expense', 'Spending categories and limits'),

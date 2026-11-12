@@ -30,7 +30,7 @@ export const DEFAULT_SETTINGS = {
 
 export function freshState() {
   return {
-    version: 2, // keep equal to DATA_VERSION
+    version: 3, // keep equal to DATA_VERSION
     entries: [],
     recurring: [],
     goals: [],
@@ -40,6 +40,7 @@ export function freshState() {
     celebrated: [],       // goals that have had their confetti
     favourites: [],       // one-tap entries, like "Bus pass $3.30"
     merchants: {},        // merchant memory: "expense:tim hortons" → "Eating Out"
+    importProfiles: {},   // bank file layouts you've answered questions about, so we only ask once
     dismissedAdvice: [],
     categories: structuredClone(DEFAULT_CATEGORIES),
     settings: { ...DEFAULT_SETTINGS },
@@ -76,6 +77,9 @@ export function cleanEntry(e) {
   const pid = optStr(e.parentId, 64);
   if (pid) out.parentId = pid;
   if (Number.isInteger(e.bp) && e.bp >= 0 && e.bp <= 10000) out.bp = e.bp;
+  if (e.imported === true) out.imported = true;
+  const ik = optStr(e.importKey, 200);
+  if (ik) out.importKey = ik;
   if (Number.isSafeInteger(e.hours) && e.hours > 0 && Number.isSafeInteger(e.rateCents) && e.rateCents > 0) {
     out.hours = e.hours;
     out.rateCents = e.rateCents;
@@ -150,6 +154,20 @@ export function cleanState(raw) {
       if (typeof v === 'string' && /^(expense|income):/.test(k)) s.merchants[str(k, 100)] = str(v, 40);
     }
   }
+  if (raw.importProfiles && typeof raw.importProfiles === 'object') {
+    const idx = (v) => (Number.isInteger(v) && v >= 0 && v < 100 ? v : null);
+    for (const [sig, p] of Object.entries(raw.importProfiles).slice(0, 50)) {
+      if (!p || typeof p !== 'object' || !p.roles) continue;
+      s.importProfiles[str(sig, 2000)] = {
+        roles: {
+          date: idx(p.roles.date), amount: idx(p.roles.amount), debit: idx(p.roles.debit), credit: idx(p.roles.credit),
+          desc: Array.isArray(p.roles.desc) ? p.roles.desc.map(idx).filter((v) => v !== null).slice(0, 5) : [],
+        },
+        dateOrder: ['ymd', 'dmy', 'mdy'].includes(p.dateOrder) ? p.dateOrder : null,
+        signMode: ['negative-out', 'positive-out'].includes(p.signMode) ? p.signMode : null,
+      };
+    }
+  }
   if (Array.isArray(raw.notice)) s.notice = raw.notice.filter((x) => typeof x === 'string').slice(0, 500);
   if (Array.isArray(raw.dismissedAdvice)) s.dismissedAdvice = raw.dismissedAdvice.filter((x) => typeof x === 'string').slice(-200);
 
@@ -178,11 +196,14 @@ export function newId() {
 // Every saved copy of your data carries a version number. When an update changes how data is
 // saved, it adds a step here that converts the old format to the new one, and before any
 // conversion an exact copy of the old data is kept inside the app so it can be restored.
-export const DATA_VERSION = 2;
+export const DATA_VERSION = 3;
 
 const MIGRATIONS = {
   // v1 (Stage 1): only entries, categories and two settings. Everything added later starts empty.
   1: (raw) => ({ ...raw, version: 2 }),
+  // v3 adds refunds (a new kind of entry). Existing entries don't change; the version marks
+  // that this data may hold refunds, and the step before it keeps a copy of the v2 data.
+  2: (raw) => ({ ...raw, version: 3 }),
 };
 
 export function savedVersion(raw) {

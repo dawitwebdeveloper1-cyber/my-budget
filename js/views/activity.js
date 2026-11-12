@@ -101,9 +101,9 @@ function mini(label, result, kind) {
 
 export function entryRow(e, now) {
   const future = e.at > now;
-  const kind = e.type === 'income' ? 'in' : e.type === 'saving' ? 'save' : 'out';
+  const kind = e.type === 'income' || e.type === 'refund' ? 'in' : e.type === 'saving' ? 'save' : 'out';
   const meta = future ? `Counts from ${formatDateTime(e.at)}`
-    : `${e.type === 'saving' ? 'Savings' : e.category} · ${formatTime(e.at)}${e.recurringId ? ' · repeats' : ''}`;
+    : `${e.type === 'saving' ? 'Savings' : e.type === 'refund' ? `Refund · ${e.category}` : e.category} · ${formatTime(e.at)}${e.recurringId ? ' · repeats' : ''}`;
   const el = h('button', { class: `entry ${future ? 'future' : ''}`, onClick: () => openEntrySheet(e, {}, { from: el }) },
     h('div', {}, h('div', {}, e.name), h('div', { class: 'meta' }, meta)),
     money(signed(e), { kind }));
@@ -118,6 +118,8 @@ export function entryRow(e, now) {
       // Repeat: the same entry again, today, saved straight away (with Undo)
       isMoney ? { label: 'Repeat today', icon: 'repeat', run: () => change((st) => repeatEntry(st, e, nowStamp(), newId), `Repeated ${e.name} ${formatCents(signed(e), { sign: 'always' })}`) } : null,
       isMoney ? { label: 'Duplicate', icon: 'copy', run: () => openEntrySheet(null, duplicateOf(e)) } : null,
+      // Money back for this purchase: same name and category, ready to save
+      e.type === 'expense' ? { label: 'Got a refund', icon: 'repeat', run: () => openEntrySheet(null, { ...duplicateOf(e), type: 'refund' }) } : null,
       isMoney ? (fav
         ? { label: 'Remove from favourites', icon: 'star', run: () => change((st) => removeFavourite(st, e), 'Removed from favourites') }
         : { label: 'Add to favourites', icon: 'star', run: () => (full ? toast(`Favourites are full (${MAX_FAVOURITES}). Remove one first.`) : change((st) => addFavourite(st, e, newId), `${e.name} is now a favourite`)) }) : null,

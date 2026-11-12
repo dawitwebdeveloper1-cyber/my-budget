@@ -105,6 +105,17 @@ test('old data converts to the current version, with a copy kept first', async (
   assert.equal(copies[0].data, STAGE1, 'exact copy of the old data');
 });
 
+test('today\'s data (version 2) updates to version 3 with a restorable copy', async () => {
+  const v2 = JSON.stringify({ version: 2, entries: [{ id: 'a', type: 'expense', name: 'Lunch', cents: 1200, at: '2026-11-08T12:00', category: 'Eating Out', note: '' }], goals: [], recurring: [] });
+  const device = new Map([['mybudget.v1', v2]]);
+  await initStorage({ backend: memoryBackend(device), legacy: null });
+  const s = load();
+  assert.equal(s.version, 3);
+  assert.equal(s.entries[0].cents, 1200);
+  assert.equal(listCopies()[0].fromVersion, 2);
+  assert.equal(listCopies()[0].data, v2);
+});
+
 test('the pre-update copy restores exactly', async () => {
   const device = new Map([['mybudget.v1', STAGE1]]);
   await initStorage({ backend: memoryBackend(device), legacy: null });
@@ -145,7 +156,10 @@ test('unreadable saved data is kept as a copy, never silently thrown away', asyn
 test('every version converts step by step', () => {
   assert.equal(savedVersion({}), 1);
   assert.equal(savedVersion({ version: 2 }), 2);
+  assert.equal(DATA_VERSION, 3);
   assert.equal(upgradeRaw({ entries: [] }).version, DATA_VERSION);
+  assert.equal(upgradeRaw({ version: 2, entries: [] }).version, 3);
+  assert.equal(freshState().version, DATA_VERSION, 'new data starts at the current version');
   assert.equal(fromSaved(JSON.parse(STAGE1)).entries.length, 2);
 });
 

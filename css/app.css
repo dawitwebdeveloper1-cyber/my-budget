@@ -605,6 +605,25 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .scan-bar { width: 100%; max-width: 280px; }
 .scan-photo { border-radius: 18px; overflow: hidden; margin-bottom: 8px; background: var(--soft); }
 .scan-photo canvas { display: block; width: 100%; height: auto; max-height: 220px; object-fit: cover; }
+.refund-check { margin: -2px 0 14px; font-weight: 600; font-size: 14px; color: var(--label); }
+
+/* Bank import */
+.import-sum { margin-bottom: 10px; }
+.import-sum details { margin-top: 6px; }
+.import-list { display: flex; flex-direction: column; gap: 8px; max-height: 52dvh; overflow-y: auto; margin: 0 -4px; padding: 0 4px; }
+.import-row { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: start; padding: 10px 12px; border-radius: 16px; background: var(--surface); }
+.import-row.off { opacity: .55; }
+.import-row input[type="checkbox"] { width: 20px; height: 20px; margin-top: 2px; accent-color: var(--accent); }
+.import-name { font-weight: 700; overflow-wrap: anywhere; }
+.import-row .num { font-weight: 800; white-space: nowrap; }
+.small-select { margin-top: 6px; padding: 6px 10px; font-size: 14px; min-height: 0; }
+.maybe { color: var(--out); font-weight: 600; }
+.refund-tag { color: var(--in); font-weight: 700; }
+.map-list { display: flex; flex-direction: column; gap: 10px; margin: 10px 0; }
+.map-row { display: grid; grid-template-columns: 1fr 150px; gap: 10px; align-items: center; padding: 10px 12px; border-radius: 16px; background: var(--surface); }
+.map-ex { display: flex; flex-direction: column; min-width: 0; overflow-wrap: anywhere; }
+.map-row .input { padding: 10px; font-size: 14px; }
+.guide-list { margin: 12px 0; }
 .heard { text-align: center; color: var(--label); font-style: italic; margin: 0 0 4px; }
 
 .steps { margin: 14px 0; padding-left: 22px; line-height: 1.5; }

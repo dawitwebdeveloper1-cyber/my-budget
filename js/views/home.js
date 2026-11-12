@@ -153,9 +153,16 @@ const sliceColour = (i) => `var(--c${(i % 9) + 1})`;
 function renderRing(sum, motion, rv) {
   const card = h('section', { class: `card${rv}` }, h('h2', {}, 'Spending by category'));
   if (!sum.categoriesOk || !sum.moneyOut.ok) { card.append(h('p', { class: 'unverified' }, UNVERIFIED)); return card; }
-  const cats = sum.byCategory;
+  const all = sum.byCategory;
   const total = -sum.moneyOut.value;
-  if (!cats.length) { card.append(emptyState('sparkle', 'No spending yet', 'Your spending this month will show up here, by category.')); return card; }
+  // Only categories with spending get a slice; ones where refunds outweighed spending are listed as money back.
+  const cats = all.filter((c) => c.value > 0);
+  const back = all.filter((c) => c.value < 0);
+  const sliceTotal = cats.reduce((a, c) => a + c.value, 0);
+  if (!cats.length) {
+    card.append(emptyState('sparkle', 'No spending yet', back.length ? 'Only refunds so far this month.' : 'Your spending this month will show up here, by category.'));
+    return card;
+  }
 
   const CX = 100;
   const R = 80;
@@ -167,7 +174,7 @@ function renderRing(sum, motion, rv) {
   const step = Math.min(250, Math.floor(1100 / cats.length));
   let offset = 0;
   const segs = cats.map((c, i) => {
-    const len = (c.value / total) * C;
+    const len = (c.value / sliceTotal) * C;
     const dash = single ? C : Math.max(len - W - gap, 0.001);
     const startAt = single ? 0 : offset + W / 2 + gap / 2;
     const seg = svg('circle', {
@@ -202,7 +209,8 @@ function renderRing(sum, motion, rv) {
       dot, h('span', { class: 'n' }, c.category), h('span', { class: 'v num' }, formatCents(c.value)));
     if (motion) setTimeout(() => el.classList.add('go'), i * step + 80);
     return el;
-  }));
+  }), back.map((c) => h('button', { class: 'cat-item press', onClick: () => openReceipt(c, card) },
+    h('i', { class: 'swatch' }), h('span', { class: 'n' }, c.category), h('span', { class: 'v num in' }, `${formatCents(-c.value, { sign: 'always' })} back`))));
 
   card.append(h('div', { class: 'ring-row' }, ring, list), h('div', { class: 'ring-how' }, howButton(sum.moneyOut, 'Show me how (all spending)')));
   return card;
