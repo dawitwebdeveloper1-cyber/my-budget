@@ -7,6 +7,7 @@ import { nowStamp } from '../dates.js';
 import { signed } from '../calc.js';
 import { addEntry, quickEntry } from '../ops.js';
 import { suggestCategories, merchantCategory } from '../suggest.js';
+import { voiceAvailable, listen, bestGuess } from '../voice.js';
 import { openEntrySheet } from './entry.js';
 
 export function openQuickAdd(from = null) {
@@ -16,7 +17,8 @@ export function openQuickAdd(from = null) {
   const catsEl = h('div', { class: 'qa-cats-wrap' });
   const favEl = h('div', { class: 'fav-row' });
   const cents = () => parseAmount(d.amount);
-  const sheet = openSheet('Add', () => view(), { from });
+  let stopVoice = null;
+  const sheet = openSheet('Add', () => view(), { from, onClose: () => stopVoice?.() });
 
   function view() {
     drawAmount();
@@ -32,7 +34,10 @@ export function openQuickAdd(from = null) {
         h('button', { 'aria-pressed': String(d.type === 'income'), onClick: () => setType('income') }, 'Money in'),
         h('button', { 'aria-pressed': String(d.type === 'expense'), onClick: () => setType('expense') }, 'Money out')),
       favEl,
-      amountEl,
+      h('div', { class: 'qa-amount-row' },
+        amountEl,
+        // The mic only shows where the phone supports speech, and hides after two failures.
+        voiceAvailable() ? h('button', { class: 'mic-btn', 'aria-label': 'Say it instead', onClick: startVoice }, icon('mic')) : null),
       nameInput,
       catsEl,
       d.showNote
@@ -131,6 +136,78 @@ export function openQuickAdd(from = null) {
     const entry = quickEntry({ type: f.type, cents: f.cents, category: f.category, name: f.name, at: nowStamp(), newId });
     sheet.close();
     change((st) => addEntry(st, entry, newId), `Saved ${f.name} ${formatCents(signed(entry), { sign: 'always' })}`);
+  }
+
+  // ---- Voice entry: listen, then always show a confirm card before saving
+  function backToKeypad() {
+    stopVoice?.();
+    stopVoice = null;
+    sheet.setTitle('Add');
+    sheet.setContent(view());
+  }
+
+  function startVoice() {
+    const msg = h('p', { class: 'voice-msg' });
+    const again = h('div', { class: 'actions', hidden: true },
+      h('button', { class: 'btn primary', onClick: startVoice }, 'Try again'),
+      h('button', { class: 'btn ghost', onClick: backToKeypad }, 'Type it instead'));
+    let failed = false;
+    const fail = (text) => {
+      failed = true;
+      sheet.setTitle('Add');
+      msg.textContent = text;
+      mic.classList.remove('on');
+      again.hidden = false;
+      cancel.hidden = true;
+    };
+    const mic = h('div', { class: 'mic-big on', 'aria-hidden': 'true' }, icon('mic'));
+    const cancel = h('button', { class: 'btn ghost', onClick: backToKeypad }, 'Cancel');
+    sheet.setTitle('Listening…');
+    sheet.setContent(h('div', { class: 'voice-wrap' },
+      mic,
+      h('p', { class: 'dim center' }, 'Say something like', h('br'), '"spent 12 dollars on lunch"'),
+      msg, again, cancel));
+    stopVoice = listen({
+      onResult: (alts) => { stopVoice = null; confirmVoice(bestGuess(alts, s)); },
+      onError: (err) => fail(err === 'not-allowed' || err === 'service-not-allowed'
+        ? 'Microphone access is off. You can allow it in your phone\'s settings, or type it in.'
+        : err === 'no-speech' ? "I didn't hear anything. Try again?" : "Couldn't use voice just now. Try again, or type it in."),
+      onEnd: (got) => { if (!got && !failed) fail("I didn't catch that. Try again?"); },
+    });
+  }
+
+  function confirmVoice(p) {
+    const v = { type: p.type, cents: p.cents, category: p.category, name: p.name };
+    sheet.setTitle('Is this right?');
+    const draw = () => {
+      const cats = s.categories[v.type];
+      const shown = v.category ? cats : suggestCategories(s, { type: v.type, cents: v.cents, name: v.name, now: nowStamp(), limit: cats.length });
+      const ready = v.cents && v.category;
+      sheet.setContent(
+        h('p', { class: 'heard' }, `"${p.heard}"`),
+        v.cents
+          ? h('div', { class: `qa-amount num ${v.type === 'income' ? 'in' : 'out'}` }, formatCents(v.type === 'income' ? v.cents : -v.cents, { sign: 'always' }))
+          : h('p', { class: 'voice-msg' }, "I didn't hear an amount."),
+        v.cents ? h('p', { class: 'qa-hint' }, 'Check the amount: "fifteen" and "fifty" sound alike.') : null,
+        h('div', { class: 'seg small', role: 'group', 'aria-label': 'Money in or out' },
+          h('button', { 'aria-pressed': String(v.type === 'income'), onClick: () => { v.type = 'income'; if (!s.categories.income.includes(v.category)) v.category = null; draw(); } }, 'Money in'),
+          h('button', { 'aria-pressed': String(v.type === 'expense'), onClick: () => { v.type = 'expense'; if (!s.categories.expense.includes(v.category)) v.category = null; draw(); } }, 'Money out')),
+        h('input', { class: 'input qa-name', value: v.name, maxlength: 80, placeholder: 'Name (optional)', onInput: (e) => { v.name = e.target.value; } }),
+        h('div', { class: 'qa-cats-wrap' },
+          h('div', { class: 'qa-hint' }, v.category ? 'Category' : 'Pick a category'),
+          h('div', { class: 'chips' }, shown.map((c) => h('button', { class: 'chip', 'aria-pressed': String(c === v.category), onClick: () => { v.category = c; draw(); } }, c)))),
+        h('div', { class: 'actions' },
+          h('button', { class: 'btn primary', disabled: !ready, onClick: () => saveVoice(v) }, v.cents ? 'Save' : 'Save (needs an amount)'),
+          h('button', { class: 'btn ghost', onClick: () => { d.type = v.type; d.amount = v.cents ? centsToInput(v.cents).replace(/\.00$/, '') : ''; d.name = v.name; backToKeypad(); } }, v.cents ? 'Fix it on the keypad' : 'Type the amount'),
+          h('button', { class: 'link', onClick: startVoice }, 'Try again')));
+    };
+    draw();
+  }
+
+  function saveVoice(v) {
+    const entry = quickEntry({ type: v.type, cents: v.cents, category: v.category, name: v.name, at: nowStamp(), newId });
+    sheet.close();
+    change((st) => addEntry(st, entry, newId), `Saved ${formatCents(signed(entry), { sign: 'always' })} · ${v.category}`);
   }
 
   // Date, time, repeating, hours × pay: the full form, with what's typed so far carried over.
