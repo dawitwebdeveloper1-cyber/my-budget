@@ -1,6 +1,7 @@
 import { h, icon, toast } from './ui.js';
 import { app, persist, newId } from './state.js';
 import { load } from './store.js';
+import { initStorage, requestPersistence } from './storage.js';
 import { nowStamp, budgetMonth } from './dates.js';
 import { runRecurring } from './ops.js';
 import { goalProgress } from './budget.js';
@@ -117,8 +118,14 @@ document.addEventListener('visibilitychange', () => {
 // Re-check every 30 seconds so entries count right on time.
 setInterval(() => catchUp(false), 30_000);
 
-if (hasVault()) showLock(start);
-else start(load());
+// Start: open the device storage (moving old data across safely), ask the phone to keep it, then go.
+async function boot() {
+  await initStorage();
+  requestPersistence();
+  if (hasVault()) showLock(start);
+  else start(load());
+}
+boot();
 
 if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
   navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).catch(() => {});

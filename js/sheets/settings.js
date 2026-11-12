@@ -8,6 +8,8 @@ import { parsePercent, formatPercent } from '../budget.js';
 import { activeRules, renameCategory, deleteCategory, addCategory, PAYCHECK } from '../ops.js';
 import { hasVault, bioEnabled, bioAvailable, enableBio, disableBio, backupParts, adoptBackup } from '../vault.js';
 import { makeBackup, parseBackup, readBackup } from '../backup.js';
+import { listCopies, restoreCopy } from '../store.js';
+import { isPersisted, flushStorage } from '../storage.js';
 import { openPasscodeSetup, openChangePasscode, openNewRecoveryKey } from '../lock.js';
 import { openRuleSheet } from '../views/reminders.js';
 import { openEntrySheet } from './entry.js';
@@ -201,6 +203,7 @@ export function openSettings(openSection = null, from = null) {
   // ---------- Backup ----------
   function backup() {
     const st = app.state.settings;
+    const copies = listCopies();
     const file = h('input', { type: 'file', accept: '.json,application/json', class: 'sr' });
     file.addEventListener('change', () => { const f = file.files?.[0]; if (f) importFile(f); file.value = ''; });
     return [
@@ -214,7 +217,23 @@ export function openSettings(openSection = null, from = null) {
       line('Weekly backup reminder', toggle(st.backupReminder, (on) => { change((x) => { x.settings.backupReminder = on; }, null); saved(); redraw(); }, 'Weekly backup reminder'),
         'A gentle line in the app after 7 days.'),
       h('button', { class: 'btn ghost', onClick: addBackupReminder }, 'Add weekly reminder to Calendar'),
+      h('p', { class: 'faint small-note' }, isPersisted()
+        ? 'This phone is set to keep My Budget\'s data, even when storage runs low.'
+        : 'Tip: add My Budget to your home screen so the phone keeps its data safe.'),
+      copies.length ? h('button', { class: 'btn ghost', onClick: () => confirmRestoreCopy(copies[0]) },
+        `Restore data from before the last update (${new Date(copies[0].savedAt).toLocaleDateString('en-CA', { month: 'short', day: 'numeric' })})`) : null,
     ];
+  }
+
+  // A copy of the data is kept automatically before an update converts it.
+  function confirmRestoreCopy(copy) {
+    const cs = openSheet('Restore older data?', () => [
+      h('p', { class: 'dim' }, 'Before an update changed how your data is saved, My Budget kept a copy. Restoring puts that copy back exactly as it was, and the app restarts.'),
+      h('p', { class: 'faint small-note' }, 'Anything added since that update will be replaced. Export a backup first if you want to keep it.'),
+      h('div', { class: 'actions' },
+        h('button', { class: 'btn primary', onClick: async () => { await restoreCopy(copy.key); await flushStorage(); location.reload(); } }, 'Restore and restart'),
+        h('button', { class: 'btn ghost', onClick: () => cs.close() }, 'Cancel')),
+    ]);
   }
 
   async function exportBackup() {

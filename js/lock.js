@@ -6,7 +6,7 @@ import {
   unlock, unlockBio, bioEnabled, bioAvailable, enableBio, passLength, waitSeconds,
   setupVault, changePasscode, checkPasscode, replaceRecoveryKey,
 } from './vault.js';
-import { cleanState } from './store.js';
+import { fromSaved } from './store.js';
 
 // ---------- Keypad ----------
 // length: exact number of digits (auto-submits), or null for 6–12 digits with a Continue button.
@@ -69,7 +69,7 @@ export function showLock(onUnlocked) {
 
   const msg = h('p', { class: 'lock-msg', role: 'status' });
   const screen = h('div', { class: 'lock', role: 'dialog', 'aria-label': 'My Budget is locked' });
-  const done = (state) => { screen.remove(); onUnlocked(cleanState(state)); };
+  const done = (state) => { screen.remove(); onUnlocked(fromSaved(state)); };
 
   const tryBio = async () => {
     msg.textContent = '';

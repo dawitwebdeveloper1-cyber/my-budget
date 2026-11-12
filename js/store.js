@@ -1,7 +1,8 @@
 // Saves everything on this device only. Nothing is ever sent anywhere.
-// Stage 3 replaces this storage with an encrypted version (passcode + Face ID).
+// With a passcode set, vault.js saves an encrypted version instead.
 
 import { isStamp } from './dates.js';
+import { getItem, setItem, removeItem, keys } from './storage.js';
 import { MAX_ENTRY_CENTS } from './money.js';
 import { TYPES } from './calc.js';
 import { FREQS, KINDS } from './recurring.js';
@@ -29,7 +30,7 @@ export const DEFAULT_SETTINGS = {
 
 export function freshState() {
   return {
-    version: 2,
+    version: 2, // keep equal to DATA_VERSION
     entries: [],
     recurring: [],
     goals: [],
@@ -86,7 +87,7 @@ export function cleanRule(r) {
   if (!cents(r.cents) || !isStamp(r.anchor) || !(r.freq in FREQS)) return null;
   const name = str(r.name, 80).trim();
   if (!name) return null;
-  return {
+  const out = {
     id: str(r.id, 64) || newId(),
     type: r.type,
     kind: r.kind in KINDS ? r.kind : 'other',
@@ -97,9 +98,13 @@ export function cleanRule(r) {
     anchor: r.anchor,
     nextIndex: Number.isInteger(r.nextIndex) && r.nextIndex >= 0 ? r.nextIndex : 0,
     endAt: isStamp(r.endAt) ? r.endAt : null,
-    hours: Number.isSafeInteger(r.hours) && r.hours > 0 ? r.hours : undefined,
-    rateCents: Number.isSafeInteger(r.rateCents) && r.rateCents > 0 ? r.rateCents : undefined,
   };
+  // Only paychecks logged as hours × pay carry these.
+  if (Number.isSafeInteger(r.hours) && r.hours > 0 && Number.isSafeInteger(r.rateCents) && r.rateCents > 0) {
+    out.hours = r.hours;
+    out.rateCents = r.rateCents;
+  }
+  return out;
 }
 
 export function cleanGoal(g) {
@@ -156,18 +161,101 @@ export function newId() {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
 }
 
+// ---------- Data versions ----------
+// Every saved copy of your data carries a version number. When an update changes how data is
+// saved, it adds a step here that converts the old format to the new one, and before any
+// conversion an exact copy of the old data is kept inside the app so it can be restored.
+export const DATA_VERSION = 2;
+
+const MIGRATIONS = {
+  // v1 (Stage 1): only entries, categories and two settings. Everything added later starts empty.
+  1: (raw) => ({ ...raw, version: 2 }),
+};
+
+export function savedVersion(raw) {
+  return Number.isInteger(raw?.version) && raw.version > 0 ? raw.version : 1;
+}
+
+// Converts saved data of any older version to the current one, one step at a time.
+export function upgradeRaw(raw) {
+  let r = raw;
+  let v = savedVersion(r);
+  while (v < DATA_VERSION) {
+    const step = MIGRATIONS[v];
+    if (!step) throw new Error(`No conversion from version ${v}`);
+    r = step(r);
+    v = savedVersion(r);
+  }
+  return r;
+}
+
+// Saved data (any version) → clean, current app data.
+export function fromSaved(raw) {
+  return cleanState(upgradeRaw(raw));
+}
+
+// ---------- Copies kept before a conversion ----------
+const COPY_PREFIX = 'mybudget.copy.';
+const KEEP_COPIES = 3;
+
+export function keepCopy(fromVersion, text, kind = 'plain', now = new Date()) {
+  const key = `${COPY_PREFIX}${now.toISOString()}`;
+  setItem(key, JSON.stringify({ savedAt: now.toISOString(), fromVersion, kind, data: text }));
+  const all = listCopies();
+  for (const old of all.slice(KEEP_COPIES)) removeItem(old.key);
+  return key;
+}
+
+// Newest first.
+export function listCopies() {
+  return keys().filter((k) => k.startsWith(COPY_PREFIX)).sort().reverse().map((key) => {
+    try {
+      const c = JSON.parse(getItem(key));
+      return { key, savedAt: c.savedAt, fromVersion: c.fromVersion, kind: c.kind, data: c.data };
+    } catch {
+      return null;
+    }
+  }).filter(Boolean);
+}
+
+// Puts a kept copy back exactly as it was. The app reloads afterwards.
+export async function restoreCopy(key) {
+  const c = listCopies().find((x) => x.key === key);
+  if (!c) return false;
+  if (c.kind === 'vault') {
+    await setItem(VAULT_KEY, c.data);
+    await removeItem(KEY);
+  } else {
+    await setItem(KEY, c.data);
+  }
+  return true;
+}
+
+// ---------- Loading and saving ----------
+const VAULT_KEY = 'mybudget.vault';
+
 export function load() {
+  const text = getItem(KEY);
+  if (!text) return freshState();
+  let raw;
   try {
-    const raw = localStorage.getItem(KEY);
-    return raw ? cleanState(JSON.parse(raw)) : freshState();
+    raw = JSON.parse(text);
   } catch {
+    keepCopy('unreadable', text); // never silently lose something we can't read
+    return freshState();
+  }
+  if (savedVersion(raw) !== DATA_VERSION) keepCopy(savedVersion(raw), text);
+  try {
+    return fromSaved(raw);
+  } catch {
+    keepCopy(savedVersion(raw), text);
     return freshState();
   }
 }
 
 export function save(state) {
   try {
-    localStorage.setItem(KEY, JSON.stringify(state));
+    setItem(KEY, JSON.stringify({ ...state, version: DATA_VERSION })).catch(() => {});
     return true;
   } catch {
     return false;

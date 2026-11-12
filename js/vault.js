@@ -4,6 +4,9 @@ import {
   newRecoveryKey, randomBytes, toB64, fromB64, PASS_ITERATIONS, RECOVERY_ITERATIONS, validPasscode,
 } from './crypto.js';
 
+import { getItem, setItem, removeItem, flushStorage } from './storage.js';
+import { savedVersion, keepCopy, DATA_VERSION } from './store.js';
+
 const VAULT_KEY = 'mybudget.vault';
 const PLAIN_KEY = 'mybudget.v1';
 
@@ -12,7 +15,7 @@ let chain = Promise.resolve();
 
 export function readVault() {
   try {
-    const v = JSON.parse(localStorage.getItem(VAULT_KEY));
+    const v = JSON.parse(getItem(VAULT_KEY));
     return v && v.v === 1 && v.pass && v.rec && v.data ? v : null;
   } catch {
     return null;
@@ -20,7 +23,7 @@ export function readVault() {
 }
 
 function writeVault(v) {
-  localStorage.setItem(VAULT_KEY, JSON.stringify(v));
+  setItem(VAULT_KEY, JSON.stringify(v)).catch(() => {});
 }
 
 export const hasVault = () => readVault() !== null;
@@ -31,7 +34,7 @@ export const passLength = () => readVault()?.passLen ?? 6;
 export async function setupVault(state, passcode, recoveryKey) {
   const made = await createVault(state, passcode, recoveryKey);
   writeVault(made.vault);
-  localStorage.removeItem(PLAIN_KEY); // the unencrypted copy is removed
+  removeItem(PLAIN_KEY).catch(() => {}); // the unencrypted copy is removed
   dataKey = made.dataKey;
 }
 
@@ -50,7 +53,7 @@ export function saveEncrypted(state) {
 }
 
 export function flush() {
-  return chain;
+  return chain.then(() => flushStorage());
 }
 
 // ---------- Unlocking (with a growing wait after repeated wrong tries) ----------
@@ -75,6 +78,8 @@ function clearFailures() {
 async function finishUnlock(dk) {
   const v = readVault();
   const state = await decryptData(dk, v.data);
+  // Older saved format: keep an exact copy of the locked data before it gets converted.
+  if (savedVersion(state) !== DATA_VERSION) keepCopy(savedVersion(state), getItem(VAULT_KEY), 'vault');
   dataKey = dk;
   clearFailures();
   return state;
@@ -133,7 +138,7 @@ export function backupParts() {
 // Use an encrypted backup's passcode and recovery key on a device that has none yet.
 export async function adoptBackup(backup, dk, state) {
   writeVault({ v: 1, passLen: backup.passLen ?? 6, pass: backup.pass, rec: backup.rec, bio: null, data: await encryptData(dk, state) });
-  localStorage.removeItem(PLAIN_KEY);
+  removeItem(PLAIN_KEY).catch(() => {});
   dataKey = dk;
 }
 

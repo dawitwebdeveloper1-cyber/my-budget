@@ -15,13 +15,18 @@ export function countUp(el, target, format, { duration = 900, delay = 0 } = {}) 
   if (reducedMotion() || !Number.isSafeInteger(target) || target === 0) return;
   el.textContent = format(0);
   const start = performance.now() + delay;
+  let done = false;
+  const finish = () => { if (!done) { done = true; el.textContent = format(target); } };
   const step = (now) => {
-    if (!el.isConnected) return;
+    if (!el.isConnected || done) return;
     const t = Math.min(1, Math.max(0, (now - start) / duration));
-    el.textContent = t >= 1 ? format(target) : format(Math.round(target * easeOut(t)));
-    if (t < 1) requestAnimationFrame(step);
+    if (t >= 1) { finish(); return; }
+    el.textContent = format(Math.round(target * easeOut(t)));
+    requestAnimationFrame(step);
   };
   requestAnimationFrame(step);
+  // Safety net: if the screen isn't drawing frames (app in the background), still land on the exact number.
+  setTimeout(finish, delay + duration + 80);
 }
 
 // Cards fade in and slide up a little as they scroll into view, one after another.
@@ -43,6 +48,13 @@ export function reveal(root) {
     }
   }, { rootMargin: '0px 0px -24px 0px' });
   items.forEach((el) => observer.observe(el));
+  // Safety net: anything already on screen is shown even if the browser isn't drawing frames.
+  setTimeout(() => {
+    for (const el of items) {
+      if (!el.isConnected || el.classList.contains('shown')) continue;
+      if (el.getBoundingClientRect().top < innerHeight) { el.classList.add('shown'); observer?.unobserve(el); }
+    }
+  }, 1200);
 }
 
 // A short confetti burst in the app's colours.

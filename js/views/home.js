@@ -1,4 +1,4 @@
-import { h, s as svg, icon } from '../ui.js';
+import { h, s as svg, icon, openSheet } from '../ui.js';
 import { app, persist } from '../state.js';
 import { formatCents } from '../money.js';
 import { budgetMonth, shiftBudgetMonth, parseStamp } from '../dates.js';
@@ -47,10 +47,13 @@ export function renderHome(now, animate = false) {
         `${statusText} `, sum.net.ok ? h('b', { class: 'num' }, formatCents(sum.net.value, { sign: 'always' })) : null),
       sum.left.ok ? howButton(sum.left) : null));
 
-  // ---- One gentle line at a time: passcode set-up first, then backup, then spending advice.
+  // ---- One gentle line at a time: home screen first (keeps data safe), then passcode, backup, advice.
   let advice = null;
   const backupDays = backupDue(st.settings, st.entries.length > 0, now);
-  if (!hasVault() && st.entries.length > 0) {
+  if (!isInstalled()) {
+    advice = h('button', { class: `advice action${rv}`, onClick: (e) => openInstallHelp(e.currentTarget) },
+      h('span', {}, 'Add My Budget to your home screen so your data stays safe.'), icon('right'));
+  } else if (!hasVault() && st.entries.length > 0) {
     advice = h('button', { class: `advice action${rv}`, onClick: () => openPasscodeSetup() },
       h('span', {}, "Your data isn't locked yet. Set a passcode to encrypt it."), icon('right'));
   } else if (backupDays !== null) {
@@ -118,6 +121,23 @@ function heroProgress(p, motion) {
     h('button', { class: 'used press', onClick: (e) => openReceipt(p, e.currentTarget.closest('.card')) },
       h('span', {}, pct, p.basis === 'budget' ? " of this month's budget used" : " of this month's money used"),
       h('span', { class: 'num' }, `${formatCents(p.spent)} of ${formatCents(p.base)}`)));
+}
+
+// Opened from the home screen icon (not inside Safari)?
+export function isInstalled() {
+  return (typeof matchMedia === 'function' && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
+}
+
+function openInstallHelp(from) {
+  openSheet('Keep your data safe', () => [
+    h('p', { class: 'dim' }, 'When My Budget is only opened in Safari, the iPhone can clear its saved data if you don\'t visit for about a week. Adding it to your home screen stops that, and it opens full screen like a normal app.'),
+    h('ol', { class: 'steps' },
+      h('li', {}, 'Open this page in ', h('b', {}, 'Safari'), '.'),
+      h('li', {}, 'Tap the ', h('b', {}, 'Share'), ' button (the square with an arrow).'),
+      h('li', {}, 'Scroll down and tap ', h('b', {}, 'Add to Home Screen'), ', then ', h('b', {}, 'Add'), '.'),
+      h('li', {}, 'From now on, open My Budget from that icon.')),
+    h('p', { class: 'faint small-note' }, 'Data saved here in Safari and data in the home screen app are kept separately. If you already have entries here, export a backup first (Settings → Backup) and import it in the home screen app.'),
+  ], { from });
 }
 
 function daysSince(startStamp, now) {

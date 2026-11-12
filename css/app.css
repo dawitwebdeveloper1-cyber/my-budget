@@ -560,6 +560,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .cat-item.pre { opacity: 0; transform: translateY(6px); }
 .cat-item.go { opacity: 1; transform: none; transition: opacity .35s var(--ease), transform .35s var(--ease); }
 .ring-how { margin-top: 12px; }
+.steps { margin: 14px 0; padding-left: 22px; line-height: 1.5; }
+.steps li { margin: 8px 0; }
 @media (max-width: 345px) { .ring-row { grid-template-columns: 1fr; justify-items: center; } .cat-list { width: 100%; } }
 
 /* ---------- Confetti ---------- */

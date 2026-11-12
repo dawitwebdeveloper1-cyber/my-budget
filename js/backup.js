@@ -2,7 +2,7 @@
 // If a passcode is set, the file is encrypted and opens with that passcode or your recovery key.
 
 import { encryptData, decryptData, openVault } from './crypto.js';
-import { cleanState } from './store.js';
+import { fromSaved } from './store.js';
 import { parseStamp } from './dates.js';
 
 export const BACKUP_FORMAT = 'my-budget-backup';
@@ -26,11 +26,12 @@ export function parseBackup(text) {
 
 // Opens a backup. For encrypted ones, secret is the passcode or recovery key it was made with.
 export async function readBackup(backup, secret) {
-  if (!backup.encrypted) return { ok: true, state: cleanState(backup.state), dataKey: null };
+  // Older backups are converted to the current format on the way in.
+  if (!backup.encrypted) return { ok: true, state: fromSaved(backup.state), dataKey: null };
   const dataKey = await openVault(backup, secret ?? '');
   if (!dataKey) return { ok: false, error: "That passcode or recovery key doesn't open this backup." };
   try {
-    const state = cleanState(await decryptData(dataKey, backup.data));
+    const state = fromSaved(await decryptData(dataKey, backup.data));
     return { ok: true, state, dataKey };
   } catch {
     return { ok: false, error: 'This backup file is damaged.' };

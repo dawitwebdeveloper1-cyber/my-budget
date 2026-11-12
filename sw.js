@@ -1,7 +1,7 @@
 // Lets the app open with no internet. Only caches the app's own files – never your data.
 // Network first, so updates published to GitHub show up the next time you open the app online.
 
-const CACHE = 'my-budget-v8';
+const CACHE = 'my-budget-v9';
 const FILES = [
   './',
   './index.html',
@@ -27,6 +27,7 @@ const FILES = [
   './js/views/reminders.js',
   './js/views/recap.js',
   './js/crypto.js',
+  './js/storage.js',
   './js/motion.js',
   './js/vault.js',
   './js/lock.js',
