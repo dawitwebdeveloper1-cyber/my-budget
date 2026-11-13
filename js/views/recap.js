@@ -4,7 +4,8 @@ import { app } from '../state.js';
 import { formatCents } from '../money.js';
 import { monthSummary } from '../calc.js';
 import { categoryBudgets } from '../budget.js';
-import { money, openReceipt, UNVERIFIED } from '../components.js';
+import { money, openReceipt, howButton, UNVERIFIED } from '../components.js';
+import { bestWeek, goalMonth } from '../habits.js';
 
 export function openRecap(period, now) {
   const st = app.state;
@@ -28,6 +29,9 @@ export function openRecap(period, now) {
       over.length ? `Over the limit: ${over.map((r) => `${r.category} (${formatCents(r.over)})`).join(', ')}.`
         : budgets.rows.some((r) => r.limit !== null) ? 'Every category stayed within its limit.' : null,
     ].filter(Boolean);
+    const best = bestWeek(st, period, now, st.settings.weekStartDay);
+    const goals = goalMonth(st, period, now);
+    const fact = (text, result) => h('li', {}, text, result?.receipt ? [' ', howButton(result)] : null);
     return [
       h('p', { class: 'recap-head' }, headline),
       h('div', { class: 'card flat' }, h('div', { class: 'rows' },
@@ -36,7 +40,12 @@ export function openRecap(period, now) {
         sum.saved.value !== 0 ? row('Moved to savings', sum.saved, 'save') : null,
         row('Money out', sum.moneyOut, 'out'),
         row('Ended with', sum.left, sum.left.value < 0 ? 'out' : 'in'))),
-      h('ul', { class: 'facts' }, facts.map((f) => h('li', {}, f))),
+      h('ul', { class: 'facts' }, facts.map((f) => h('li', {}, f)),
+        best ? fact(best.text, best) : null),
+      goals.length ? h('div', { class: 'field' }, h('span', {}, 'Goals'),
+        h('ul', { class: 'facts' }, goals.map((g) => fact(
+          `${g.goal.name}: ${g.cents ? `+${formatCents(g.cents)} this month` : 'nothing added this month'}, ${g.reached ? 'reached' : `${g.percent}% there`}.`,
+          g.cents ? g.result : null)))) : null,
     ];
   });
 }

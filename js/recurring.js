@@ -34,7 +34,9 @@ export function occurrenceAt(rule, k) {
   const p = parseStamp(rule.anchor);
   if (!p) throw new Error(`Bad rule date: ${rule.anchor}`);
   let y, m, d;
-  if (rule.freq === 'weekly' || rule.freq === 'biweekly') {
+  if (rule.freq === 'daily') { // only for the evening "Log today?" calendar reminder
+    ({ y, m, d } = addDays(p.y, p.m, p.d, k));
+  } else if (rule.freq === 'weekly' || rule.freq === 'biweekly') {
     ({ y, m, d } = addDays(p.y, p.m, p.d, (rule.freq === 'weekly' ? 7 : 14) * k));
   } else if (rule.freq === 'semimonthly') {
     // The first date is one of the two days; after that it alternates between them every month.
@@ -166,6 +168,7 @@ function icsUtc(date) {
 export function rrule(rule) {
   const p = parseStamp(rule.anchor);
   switch (rule.freq) {
+    case 'daily': return 'FREQ=DAILY';
     case 'weekly': return 'FREQ=WEEKLY';
     case 'biweekly': return 'FREQ=WEEKLY;INTERVAL=2';
     case 'semimonthly': {
@@ -184,7 +187,7 @@ export function rrule(rule) {
 }
 
 // Builds a repeating calendar event with alerts (default: 1 day and 1 hour before).
-export function buildICS(rule, { amountText, alerts = ['-P1D', '-PT1H'], stampNow = new Date() } = {}) {
+export function buildICS(rule, { amountText, alerts = ['-P1D', '-PT1H'], stampNow = new Date(), description = 'Reminder from My Budget' } = {}) {
   const start = nextOccurrence(rule) ?? occurrenceAt(rule, 0);
   const title = amountText ? `${rule.name} – ${amountText}` : rule.name;
   const lines = [
@@ -200,7 +203,7 @@ export function buildICS(rule, { amountText, alerts = ['-P1D', '-PT1H'], stampNo
     'DURATION:PT15M',
     `RRULE:${rrule(rule)}`,
     `SUMMARY:${icsText(title)}`,
-    `DESCRIPTION:${icsText('Reminder from My Budget')}`,
+    `DESCRIPTION:${icsText(description)}`,
     'TRANSP:TRANSPARENT',
   ];
   alerts.forEach((trigger, i) => {

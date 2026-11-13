@@ -16,6 +16,7 @@ import { leftUntilPayday, bigPaycheck, bonusHeadsUp } from '../pay.js';
 import { openGoalSheet } from './goals.js';
 import { openAfford, openWhatIf } from '../sheets/decide.js';
 import { checkupDue } from '../decide.js';
+import { weeklyWin } from '../habits.js';
 import { openCheckup } from './reminders.js';
 
 // animate: true when the Home screen opens (count-up, progress fill, chart draw-in).
@@ -90,10 +91,15 @@ export function renderHome(now, animate = false) {
     const bonus = bonusHeadsUp(st, now);
     const dismissed = st.dismissedAdvice;
     const due = checkupDue(st, now);
+    const win = weeklyWin(st, now, st.settings.weekStartDay);
+    const winNote = win && !dismissed.includes(win.key)
+      ? { key: win.key, text: win.text, action: win.result ? (e) => openReceipt(win.result, e.currentTarget) : null }
+      : null;
     const checkKey = `checkup:${now.slice(0, 10)}`; // "not now" hides it for today
     const note = big2 && !dismissed.includes(big2.key)
       ? { key: big2.key, text: `This paycheck is ${formatCents(big2.extra)} more than usual. Put some toward a goal?`, action: () => openGoalSheet(st.goals[0] ?? null, null, big2.extra) }
       : bonus && !dismissed.includes(bonus.key) ? bonus
+        : winNote ? winNote
         : due.length && !dismissed.includes(checkKey)
           ? { key: checkKey, text: due.length === 1 ? `Subscription check-up: still using ${due[0].name}?` : `Subscription check-up: still using these ${due.length}?`, action: () => openCheckup() }
           : adviceNote({ budgets: categoryBudgets(st, period, now), summary: sum, snapshot, period, now, dismissed });

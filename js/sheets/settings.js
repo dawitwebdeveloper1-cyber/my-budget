@@ -46,6 +46,7 @@ const saved = (msg = 'Saved') => toast(msg);
 
 export function openSettings(openSection = null, from = null) {
   const opened = new Set(openSection ? [openSection] : []);
+  let logTime = null; // evening reminder time being picked (declared before the sheet draws)
   const sheet = openSheet('Settings', () => body(), { from });
 
   function redraw() { sheet.setContent(body()); }
@@ -62,7 +63,7 @@ export function openSettings(openSection = null, from = null) {
     const st = app.state.settings;
     return [
       section('money', 'Money', 'Pay, categories, auto-save, month and week', money),
-      section('alerts', 'Alerts', `Calendar alerts${st.adviceOn ? ', advice notes on' : ''}`, alerts),
+      section('alerts', 'Alerts', `Calendar alerts${st.adviceOn ? ', advice notes on' : ''}${st.logReminder ? ', evening reminder' : ''}`, alerts),
       section('security', 'Security', hasVault() ? `Passcode on${bioEnabled() ? ' · Face ID on' : ''}` : 'No passcode yet', security),
       section('backup', 'Backup', st.lastBackupAt ? `Last backup ${formatDate(st.lastBackupAt, { year: true })}` : 'No backup yet', backup),
     ];
@@ -181,7 +182,40 @@ export function openSettings(openSection = null, from = null) {
       line('Reminder time for bills', select(Array.from({ length: 17 }, (_, i) => [i + 6, hourLabel(i + 6)]), st.eventHour, (v) => setS('eventHour', Number(v)), 'Reminder time')),
       h('p', { class: 'faint small-note' }, 'Applies to calendar reminders you add from now on. To update one you already added, tap it in Reminders and add it again.'),
       line('Gentle advice notes', toggle(st.adviceOn, (on) => setS('adviceOn', on), 'Advice notes')),
+      ...logReminder(),
     ];
+  }
+
+  // The evening "Log today?" reminder: one daily Calendar event at a time you pick. Never more than one a day.
+  function logReminder() {
+    const st = app.state.settings;
+    const times = Array.from({ length: 13 }, (_, i) => { const m = 17 * 60 + i * 30; return `${pad(Math.floor(m / 60))}:${pad(m % 60)}`; });
+    const label = (t) => { const [hh, mm] = t.split(':').map(Number); return `${hh % 12 === 0 ? 12 : hh % 12}:${pad(mm)} ${hh < 12 ? 'AM' : 'PM'}`; };
+    logTime = logTime ?? st.logReminder ?? '20:00';
+    if (st.logReminder) {
+      return [
+        h('div', { class: 'set-line' }, h('div', { class: 'set-text' }, h('div', {}, 'Evening reminder'),
+          h('div', { class: 'faint small' }, `"Log today?" at ${label(st.logReminder)}, once a day`))),
+        h('p', { class: 'faint small-note' }, 'To turn it off: open Calendar, tap the "Log today?" event, then Delete Event → Delete All Future Events. To change the time, delete it there first, then add it again here.'),
+        h('button', { class: 'btn ghost', onClick: () => { change((x) => { x.settings.logReminder = null; }, null); saved('Reminder marked as removed'); redraw(); } }, "I've removed it from Calendar"),
+      ];
+    }
+    return [
+      line('Evening reminder', select(times.map((t) => [t, label(t)]), logTime, (v) => { logTime = v; }, 'Evening reminder time'),
+        'A "Log today?" alert once a day, through your Calendar.'),
+      h('button', { class: 'btn ghost', onClick: addLogReminder }, 'Add "Log today?" to Calendar'),
+    ];
+  }
+
+  function addLogReminder() {
+    const now = nowStamp();
+    const today = now.slice(0, 10);
+    let anchor = `${today}T${logTime}`;
+    if (anchor <= now) { const p = parseStamp(now); const d = addDays(p.y, p.m, p.d, 1); anchor = `${makeStamp(d.y, d.m, d.d).slice(0, 10)}T${logTime}`; }
+    addToCalendar({ id: 'my-budget-log-today', name: 'Log today?', cents: 0, freq: 'daily', anchor, nextIndex: 0, endAt: null },
+      { noAmount: true, alerts: ['PT0S'], description: 'Open My Budget and add anything you spent today.' });
+    change((x) => { x.settings.logReminder = logTime; }, null);
+    redraw();
   }
 
   // ---------- Security ----------

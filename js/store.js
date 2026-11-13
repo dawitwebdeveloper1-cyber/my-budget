@@ -26,6 +26,7 @@ export const DEFAULT_SETTINGS = {
   alertMinutes: 60,       // and 1 hour before
   backupReminder: true,
   lastBackupAt: null,
+  logReminder: null,      // "20:00": the evening "Log today?" calendar reminder you added (null = none)
 };
 
 export function freshState() {
@@ -42,6 +43,7 @@ export function freshState() {
     merchants: {},        // merchant memory: "expense:tim hortons" → "Eating Out"
     importProfiles: {},   // bank file layouts you've answered questions about, so we only ask once
     dismissedAdvice: [],
+    lastCheckin: null,    // the paycheck whose payday check-in was already shown
     categories: structuredClone(DEFAULT_CATEGORIES),
     settings: { ...DEFAULT_SETTINGS },
   };
@@ -203,6 +205,7 @@ export function cleanState(raw) {
   }
   if (Array.isArray(raw.notice)) s.notice = raw.notice.filter((x) => typeof x === 'string').slice(0, 500);
   if (Array.isArray(raw.dismissedAdvice)) s.dismissedAdvice = raw.dismissedAdvice.filter((x) => typeof x === 'string').slice(-200);
+  if (typeof raw.lastCheckin === 'string') s.lastCheckin = raw.lastCheckin.slice(0, 64);
 
   const st = raw.settings ?? {};
   const t = s.settings;
@@ -217,6 +220,7 @@ export function cleanState(raw) {
   if ([0, 15, 30, 60, 120].includes(st.alertMinutes)) t.alertMinutes = st.alertMinutes;
   if (typeof st.backupReminder === 'boolean') t.backupReminder = st.backupReminder;
   if (isStamp(st.lastBackupAt)) t.lastBackupAt = st.lastBackupAt;
+  if (typeof st.logReminder === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(st.logReminder)) t.logReminder = st.logReminder;
   return s;
 }
 

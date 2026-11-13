@@ -14,6 +14,8 @@ import { renderGoals } from './views/goals.js';
 import { renderReminders } from './views/reminders.js';
 import { openQuickAdd } from './sheets/quick.js';
 import { openWelcome } from './sheets/welcome.js';
+import { openCheckin } from './sheets/checkin.js';
+import { paydayCheckin, streak, streakText } from './habits.js';
 import { openSettings } from './sheets/settings.js';
 
 const TABS = [
@@ -47,7 +49,9 @@ function render(animate = false) {
         h('div', {},
           h('div', { class: 'eyebrow' }, v.tab === 'home' || v.tab === 'goals' ? period.label : 'My Budget'),
           h('h1', {}, TABS.find((t) => t[0] === v.tab)[1])),
-        h('button', { class: 'round-btn', 'aria-label': 'Settings', onClick: (e) => openSettings(null, e.currentTarget) }, icon('gear'))),
+        h('div', { class: 'top-right' },
+          v.tab === 'home' ? streakPill(now) : null,
+          h('button', { class: 'round-btn', 'aria-label': 'Settings', onClick: (e) => openSettings(null, e.currentTarget) }, icon('gear')))),
       screenEl),
     h('button', { class: 'fab', 'aria-label': 'Add an entry', onClick: () => openQuickAdd() }, icon('plus')),
     h('div', { class: 'tabbar' },
@@ -61,6 +65,17 @@ function render(animate = false) {
   celebrate();
 }
 app.render = () => render(false);
+
+// The streak: small and in the corner, never a big message. Tapping explains how it works.
+function streakPill(now) {
+  const s = streak(app.state, now, app.state.settings.weekStartDay);
+  const text = streakText(s);
+  if (!text) return null;
+  return h('button', { class: `streak${s.paused ? ' paused' : ''}`, 'aria-label': text, onClick: () => toast(s.paused
+    ? 'Paused, not lost. Log anything to pick it up again.'
+    : s.loggedToday ? 'Logged today. One missed day a week is free.' : s.skipUsed ? "This week's free skip is used. Log today to keep going." : 'One missed day a week is free.') },
+  `${s.count}`, h('span', {}, s.paused ? ' days · paused' : ' days'));
+}
 
 // Confetti the first time a savings goal is reached.
 function celebrate() {
@@ -86,7 +101,10 @@ function catchUp(animate = false) {
   const added = runRecurring(app.state, nowStamp(), newId);
   if (added.length) persist();
   render(animate);
-  if (app.state.notice.length) openWelcome();
+  // On payday, the check-in takes the place of "Added since your last visit".
+  const checkin = paydayCheckin(app.state, nowStamp());
+  if (checkin) openCheckin(checkin);
+  else if (app.state.notice.length) openWelcome();
 }
 
 function start(state) {

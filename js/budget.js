@@ -324,10 +324,11 @@ export function adviceNote({ budgets, summary, snapshot, period, now, dismissed 
     notes.push({ key: `over:${r.category}:${period.start}`, text: `${r.category} is ${formatCents(r.over)} over its limit. You can cover it from another category in Goals.` });
   }
   const daysLeft = Math.max(0, daysBetween(now.slice(0, 10) + 'T00:00', period.end));
-  const close = budgets.rows.filter((r) => r.limit !== null && r.ok && r.over === 0 && r.percent >= 85 && r.value >= 0)
+  // A gentle nudge at 80%: small, calm, dismissible. No alarms.
+  const close = budgets.rows.filter((r) => r.limit !== null && r.ok && r.over === 0 && r.percent >= 80 && r.value >= 0)
     .sort((a, b) => b.percent - a.percent);
   for (const r of close) {
-    notes.push({ key: `close:${r.category}:${period.start}`, text: `${r.category} has ${formatCents(r.value)} left for the next ${daysLeft} ${daysLeft === 1 ? 'day' : 'days'}.` });
+    notes.push({ key: `close:${r.category}:${period.start}`, text: `${r.category} is at ${r.percent}% of its limit, with ${formatCents(r.value)} left for the next ${daysLeft} ${daysLeft === 1 ? 'day' : 'days'}.` });
   }
   if (summary.left.ok && summary.left.value < 0) {
     notes.push({ key: `negative:${period.start}`, text: 'Spending is ahead of the money you have right now. A slower few days would help.' });

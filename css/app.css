@@ -416,6 +416,12 @@ input[type="date"].input, input[type="time"].input { min-height: 52px; }
 .advice.action svg { width: 16px; height: 16px; flex: none; color: var(--label); }
 .advice-x { flex: none; width: 26px; height: 26px; display: grid; place-items: center; color: var(--label); border-radius: 8px; }
 .advice-x svg { width: 14px; height: 14px; }
+/* The streak: small, in the corner, never loud */
+.top-right { display: flex; align-items: center; gap: 8px; }
+.streak { height: 30px; padding: 0 11px; border-radius: 999px; background: var(--settings-bg); color: var(--text); font-size: 13px; font-weight: 800; }
+.streak span { font-weight: 600; color: var(--label); }
+.streak.paused { color: var(--label); }
+.facts.checkin { font-size: 15px; color: var(--text); }
 /* Decision tools under the main card */
 .tools { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 0 0 14px; }
 .tool { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 13px 10px; border-radius: 18px; background: var(--surface); box-shadow: var(--shadow); font-size: 14.5px; font-weight: 700; color: var(--text); }
