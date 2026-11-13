@@ -416,6 +416,29 @@ input[type="date"].input, input[type="time"].input { min-height: 52px; }
 .advice.action svg { width: 16px; height: 16px; flex: none; color: var(--label); }
 .advice-x { flex: none; width: 26px; height: 26px; display: grid; place-items: center; color: var(--label); border-radius: 8px; }
 .advice-x svg { width: 14px; height: 14px; }
+/* Decision tools under the main card */
+.tools { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 0 0 14px; }
+.tool { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 13px 10px; border-radius: 18px; background: var(--surface); box-shadow: var(--shadow); font-size: 14.5px; font-weight: 700; color: var(--text); }
+.tool svg { width: 17px; height: 17px; flex: none; color: var(--label); }
+.afford { margin-top: 8px; padding: 18px; border-radius: 22px; background: var(--surface); box-shadow: var(--shadow); }
+.afford .verdict { font-size: 28px; font-weight: 800; letter-spacing: -0.01em; }
+.afford.yes .verdict { color: var(--in); }
+.afford.notyet .verdict { color: var(--out); }
+.afford-text { font-size: 16px; line-height: 1.5; margin: 6px 0 10px; }
+.hows { display: flex; flex-wrap: wrap; gap: 8px; }
+/* What-if: clearly practice, never real */
+.practice { border: 2px dashed var(--line-strong); border-radius: 22px; padding: 14px 16px 16px;
+  background: repeating-linear-gradient(135deg, transparent 0 14px, color-mix(in srgb, var(--line) 60%, transparent) 14px 16px); }
+.practice-badge { display: inline-block; font-size: 12px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; padding: 5px 10px; border-radius: 999px; background: var(--text); color: var(--bg); margin-bottom: 12px; }
+.whatif-out { margin-top: 12px; padding: 14px; border-radius: 18px; background: var(--surface); }
+.whatif-dates { display: grid; grid-template-columns: 1fr auto 1fr; gap: 8px; align-items: center; }
+.whatif-dates .arrow-r { font-size: 20px; color: var(--label); }
+.whatif-dates .num { font-size: 19px; font-weight: 800; line-height: 1.25; }
+.goal-eta { margin-top: 4px; font-size: 13.5px; color: var(--label); }
+.sub-total { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 14px 16px; border-radius: 18px; background: color-mix(in srgb, var(--surface) 72%, transparent); margin-bottom: 8px; }
+.use-row { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; padding: 12px 0; border-top: 1px solid var(--line); }
+.use-row .meta { font-size: 13.5px; color: var(--label); margin-top: 2px; }
+.use-row:first-child { border-top: 0; }
 .recap-link {
   display: flex; justify-content: space-between; align-items: center; width: 100%;
   padding: 15px 18px; margin-bottom: 14px; border-radius: 20px;

@@ -30,7 +30,7 @@ export const DEFAULT_SETTINGS = {
 
 export function freshState() {
   return {
-    version: 4, // keep equal to DATA_VERSION
+    version: 5, // keep equal to DATA_VERSION
     entries: [],
     recurring: [],
     goals: [],
@@ -67,6 +67,11 @@ export function cleanPlan(plan) {
   return out;
 }
 
+// A use counter: the times it was used (newest 500 kept, oldest first).
+function cleanUses(list) {
+  return list.filter(isStamp).sort().slice(-500);
+}
+
 // Only keep entries that are completely valid, so bad data can never reach the maths.
 export function cleanEntry(e) {
   if (!e || typeof e !== 'object') return null;
@@ -94,6 +99,7 @@ export function cleanEntry(e) {
   if (pid) out.parentId = pid;
   if (Number.isInteger(e.bp) && e.bp >= 0 && e.bp <= 10000) out.bp = e.bp;
   if (Array.isArray(e.autoSave)) out.autoSave = cleanPlan(e.autoSave);
+  if (Array.isArray(e.uses)) out.uses = cleanUses(e.uses);
   if (e.imported === true) out.imported = true;
   const ik = optStr(e.importKey, 200);
   if (ik) out.importKey = ik;
@@ -129,6 +135,9 @@ export function cleanRule(r) {
       && d[0] >= 1 && d[0] <= 28 && d[1] > d[0] && (d[1] <= 28 || d[1] === 31);
     out.days = ok ? d : [15, 31];
   }
+  // Cost per use: when each use was counted. Subscription check-up: when it was last asked.
+  if (Array.isArray(r.uses)) out.uses = cleanUses(r.uses);
+  if (isStamp(r.checkedAt)) out.checkedAt = r.checkedAt;
   // Only paychecks logged as hours × pay carry these.
   if (Number.isSafeInteger(r.hours) && r.hours > 0 && Number.isSafeInteger(r.rateCents) && r.rateCents > 0) {
     out.hours = r.hours;
@@ -220,7 +229,7 @@ export function newId() {
 // Every saved copy of your data carries a version number. When an update changes how data is
 // saved, it adds a step here that converts the old format to the new one, and before any
 // conversion an exact copy of the old data is kept inside the app so it can be restored.
-export const DATA_VERSION = 4;
+export const DATA_VERSION = 5;
 
 const MIGRATIONS = {
   // v1 (Stage 1): only entries, categories and two settings. Everything added later starts empty.
@@ -247,6 +256,9 @@ const MIGRATIONS = {
       entries: entries.map((e) => (plans.has(e?.id) && !Array.isArray(e.autoSave) ? { ...e, autoSave: plans.get(e.id) } : e)),
     };
   },
+  // v5 adds use counters (cost per use) and the subscription check-up date. Nothing existing
+  // changes; the version marks that this data may hold them, and a copy of the v4 data is kept.
+  4: (raw) => ({ ...raw, version: 5 }),
 };
 
 export function savedVersion(raw) {

@@ -8,7 +8,9 @@ import { parseStamp, makeStamp, addDays, formatDate } from './dates.js';
 import { activeRules, isPaycheck } from './ops.js';
 
 const byTime = (a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0);
-const dayNum = (stamp) => { const p = parseStamp(stamp); return Date.UTC(p.y, p.m - 1, p.d) / 86400000; };
+export const dayNum = (stamp) => { const p = parseStamp(stamp); return Date.UTC(p.y, p.m - 1, p.d) / 86400000; };
+// Whole-number division that rounds down, for negatives too (BigInt on its own rounds toward zero).
+export const floorDiv = (a, b) => { const q = a / b; return (a % b !== 0n && (a < 0n) !== (b < 0n)) ? q - 1n : q; };
 
 // The repeating paycheck, if there is one (and pay isn't set to irregular).
 export function payRule(state) {
@@ -159,6 +161,73 @@ export function bigPaycheck(state, now) {
   const extra = latest.cents - usual;
   if (usual <= 0 || latest.cents * 2 < usual * 3 || extra < 5000) return null; // 1.5× usual and at least $50 more
   return { entry: latest, usual, extra, key: `big:${latest.id}` };
+}
+
+// ---------- Looking ahead (for goal dates and "Can I afford it?") ----------
+// The usual paycheck: the scheduled amount, or the average of the last 3 when pay changes.
+export function usualPaycheck(state, now) {
+  const rule = payRule(state);
+  if (rule) return rule.cents;
+  return irregularStats(state, now)?.avg ?? null;
+}
+
+// Paydays after `now`, up to `max` of them and before `until` (a stamp).
+// Irregular pay repeats the usual gap from the last paycheck; an overdue one counts as tomorrow.
+export function futurePaydays(state, now, until, max = 400) {
+  const out = [];
+  const rule = payRule(state);
+  if (rule) {
+    for (let k = 0, guard = 0; out.length < max && guard < 20000; k++, guard++) {
+      const at = occurrenceAt(rule, k);
+      if (at >= until || !isActiveAt(rule, at)) break;
+      if (at > now) out.push(at);
+    }
+    return out;
+  }
+  const logged = loggedPaychecks(state, now).slice(-4);
+  if (logged.length < 2) return out;
+  const gaps = logged.slice(1).map((e, i) => dayNum(e.at) - dayNum(logged[i].at));
+  const gap = Math.max(1, Math.round(gaps.reduce((a, b) => a + b, 0) / gaps.length));
+  const last = parseStamp(logged.at(-1).at);
+  const d1 = addDays(last.y, last.m, last.d, gap);
+  const expected = makeStamp(d1.y, d1.m, d1.d, last.hh, last.mi);
+  // Overdue ("any day now"): plan the next one for tomorrow, then the usual gap after that.
+  const p = expected > now ? last : parseStamp(now);
+  const firstOffset = expected > now ? gap : 1;
+  for (let i = 0; out.length < max; i++) {
+    const d = addDays(p.y, p.m, p.d, firstOffset + gap * i);
+    const at = makeStamp(d.y, d.m, d.d, last.hh, last.mi);
+    if (at >= until) break;
+    if (at > now) out.push(at);
+  }
+  return out;
+}
+
+// What's usually left over from a paycheck after bills, spending and savings: the average of
+// your last 3 complete pay periods (each one runs from a paycheck to the next).
+export function usualLeftover(state, now) {
+  const pays = loggedPaychecks(state, now);
+  if (pays.length < 2) return null;
+  const periods = [];
+  for (let i = Math.max(1, pays.length - 3); i < pays.length; i++) {
+    const from = pays[i - 1].at;
+    const to = pays[i].at;
+    const inside = state.entries.filter((e) => e.at >= from && e.at < to && e.at <= now);
+    periods.push({ from, to, cents: sumCents(inside.map(signed)), count: inside.length });
+  }
+  const total = sumCents(periods.map((p) => p.cents));
+  const a = Math.floor(total / periods.length);
+  const b = Number(floorDiv(BigInt(total), BigInt(periods.length)));
+  const avg = checked(a, b);
+  if (!avg.ok) return null;
+  return {
+    ok: true, value: avg.value, periods,
+    receipt: {
+      kind: 'divide', title: 'Usually left from a paycheck', top: total, topLabel: `Left over in your last ${periods.length} pay ${periods.length === 1 ? 'period' : 'periods'}`,
+      by: periods.length, byLabel: 'Pay periods', result: avg.value,
+      parts: periods.map((p) => ({ label: `${formatDate(p.from)} to ${formatDate(p.to)}`, cents: p.cents, neutral: true })),
+    },
+  };
 }
 
 // ---------- Bonus-paycheck months ----------

@@ -147,6 +147,35 @@ export function stopRule(state, ruleId) {
   else rule.endAt = nextOccurrence(rule) ?? rule.endAt;
 }
 
+// ---------- Cost per use and the subscription check-up ----------
+const findItem = (state, kind, id) => (kind === 'rule' ? state.recurring : state.entries).find((x) => x.id === id);
+
+// Turn a use counter on (an empty list) or off (removed, with its counts).
+export function setTracking(state, kind, id, on) {
+  const item = findItem(state, kind, id);
+  if (!item) return;
+  if (on && !Array.isArray(item.uses)) item.uses = [];
+  if (!on) delete item.uses;
+}
+
+export function logUse(state, kind, id, at) {
+  const item = findItem(state, kind, id);
+  if (!item) return;
+  item.uses = [...(item.uses ?? []), at].sort().slice(-500);
+}
+
+export function undoUse(state, kind, id, at) {
+  const item = findItem(state, kind, id);
+  const i = item?.uses?.lastIndexOf(at) ?? -1;
+  if (i >= 0) item.uses.splice(i, 1);
+}
+
+// "Still using this? Yes": don't ask again for 3 months.
+export function markChecked(state, ruleId, now) {
+  const rule = state.recurring.find((r) => r.id === ruleId);
+  if (rule) rule.checkedAt = now;
+}
+
 export function activeRules(state) {
   return state.recurring.filter((r) => nextOccurrence(r) !== null);
 }

@@ -3,7 +3,7 @@ import { h, icon, openSheet } from './ui.js';
 import { formatCents } from './money.js';
 import { formatDateTime } from './dates.js';
 import { receiptMatches } from './calc.js';
-import { hoursPay, formatHours, formatExact } from './budget.js';
+import { hoursPay, formatHours, formatExact, formatPercent } from './budget.js';
 import { app } from './state.js';
 import { reducedMotion } from './motion.js';
 
@@ -70,6 +70,7 @@ export function receiptBody(result) {
   if (result?.receipt?.kind === 'product') return productReceipt(result);
   if (result?.receipt?.kind === 'ratio') return ratioReceipt(result);
   if (result?.receipt?.kind === 'divide') return divideReceipt(result);
+  if (result?.receipt?.kind === 'forecast') return forecastReceipt(result);
   if (!result?.ok || !receiptMatches(result.receipt, result.value)) return h('p', { class: 'unverified' }, UNVERIFIED);
   const r = result.receipt;
   const lines = r.lines.map((l) => h('div', { class: 'r-line' },
@@ -112,21 +113,51 @@ function divideReceipt(result) {
   const r = result.receipt;
   const by = Number(r.by);
   const partsOk = !r.parts || r.parts.reduce((a, p) => a + p.cents, 0) === r.top;
-  if (!result.ok || !Number.isInteger(by) || by < 1 || !partsOk
-    || Math.floor(r.top / by) !== r.result || Number(BigInt(r.top) / BigInt(by)) !== result.value) {
+  // Rounded down, or up for "how many paychecks" (you can't wait part of a paycheck).
+  const a = r.roundUp ? Math.ceil(r.top / by) : Math.floor(r.top / by);
+  const big = BigInt(r.top);
+  const q = big / BigInt(by);
+  const rem = big % BigInt(by);
+  const b = Number(rem === 0n ? q : r.roundUp ? (big > 0n ? q + 1n : q) : (big < 0n ? q - 1n : q));
+  if (!result.ok || !Number.isInteger(by) || by < 1 || !partsOk || a !== r.result || b !== result.value) {
     return h('p', { class: 'unverified' }, UNVERIFIED);
   }
-  const left = r.top - r.result * by;
+  // byMoney: money ÷ money = a count (e.g. $300 short ÷ $120 a paycheck = 3 paychecks, rounded up).
+  const left = r.roundUp || r.byMoney ? 0 : r.top - r.result * by;
   const line = (l, v) => h('div', { class: 'r-line' }, h('div', { class: 'l' }, l), h('div', { class: 'r' }, v));
   return h('div', {},
     h('div', { class: 'receipt' },
       line(r.topLabel, formatCents(r.top)),
-      line(`÷ ${r.byLabel}`, String(by)),
+      line(`÷ ${r.byLabel}`, r.byMoney ? formatCents(by) : String(by)),
       h('hr', { class: 'rule' }),
-      h('div', { class: 'r-total' }, h('div', {}, 'Each (rounded down)'), h('div', { class: 'r num' }, formatCents(r.result))),
-      h('p', { class: 'receipt-foot' }, `${left ? `${formatCents(left)} left over from rounding down · ` : ''}worked out two ways, both match`)),
+      h('div', { class: 'r-total' }, h('div', {}, r.resultLabel ?? 'Each (rounded down)'),
+        h('div', { class: 'r num' }, r.byMoney ? String(r.result) : formatCents(r.result))),
+      h('p', { class: 'receipt-foot' }, `${left ? `${formatCents(left)} left over from rounding down · ` : ''}${r.roundUp ? 'Rounded up, since part of a paycheck isn\'t enough · ' : ''}worked out two ways, both match`)),
     r.parts ? h('div', { class: 'receipt-part' }, h('h4', {}, r.topLabel),
       receiptBody({ ok: true, value: r.top, receipt: { totalLabel: 'Added up', lines: r.parts.map((p) => ({ ...p, type: 'income' })) } })) : null);
+}
+
+// A goal's finish date: what's still to go, and how the paychecks and top-ups cover it.
+function forecastReceipt(f) {
+  const p = f.pace;
+  const ok = f.ok && f.toGo === f.target - f.saved && f.fromPays === p.perPaycheck * f.nPays
+    && f.fromPays + f.fromTopUps >= f.toGo;
+  if (!ok) return h('p', { class: 'unverified' }, UNVERIFIED);
+  const line = (l, v, small = null) => h('div', { class: 'r-line' }, h('div', { class: 'l' }, l, small ? h('small', {}, small) : null), h('div', { class: 'r' }, v));
+  const each = [
+    p.share ? `Auto-save ${formatPercent(p.bp)} of your usual ${formatCents(p.usual)} paycheck = ${formatCents(p.share)}` : null,
+    p.extra ? `What-if: ${formatCents(p.extra)} more a paycheck` : null,
+  ].filter(Boolean);
+  return h('div', { class: 'receipt' },
+    line('Goal', formatCents(f.target)),
+    line(f.savedDelta ? 'Saved (after taking it out)' : 'Saved so far', formatCents(-f.saved)),
+    h('hr', { class: 'rule' }),
+    line('Still to go', formatCents(f.toGo)),
+    p.perPaycheck ? line(`${f.nPays} ${f.nPays === 1 ? 'paycheck' : 'paychecks'} × ${formatCents(p.perPaycheck)}`, formatCents(f.fromPays), each.join(' · ')) : null,
+    p.topUp90 ? line('Your top-ups', formatCents(f.fromTopUps), `${formatCents(p.topUp90)} added in the last 90 days, kept up for ${f.days} days`) : null,
+    h('hr', { class: 'rule' }),
+    h('div', { class: 'r-total' }, h('div', {}, 'Reached by'), h('div', { class: 'r num' }, f.label)),
+    h('p', { class: 'receipt-foot' }, 'A forecast: it moves as your saving changes · worked out two ways, both match'));
 }
 
 // Hours × hourly pay, shown as column multiplication.

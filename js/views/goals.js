@@ -7,6 +7,7 @@ import { addEntry, deleteGoal } from '../ops.js';
 import { cleanGoal } from '../store.js';
 import { money, howButton, bar, receiptBody, UNVERIFIED, emptyState } from '../components.js';
 import { reducedMotion } from '../motion.js';
+import { goalForecast, forecastText } from '../decide.js';
 
 export function renderGoals(now, animate = false) {
   const st = app.state;
@@ -25,7 +26,8 @@ export function renderGoals(now, animate = false) {
       p.ok
         ? [h('div', { class: 'goal-amts' }, h('span', { class: 'num' }, formatCents(p.value)), h('span', { class: 'faint' }, ` of ${formatCents(g.targetCents)}`)),
           bar(p.percent, { gold: true, fill }),
-          h('div', { class: 'goal-foot faint' }, p.reached ? 'Goal reached' : `${p.percent}% · ${formatCents(p.toGo)} to go`)]
+          h('div', { class: 'goal-foot faint' }, p.reached ? 'Goal reached' : `${p.percent}% · ${formatCents(p.toGo)} to go`),
+          p.reached ? null : h('div', { class: 'goal-eta' }, forecastText(goalForecast(st, g, now)) ?? '')]
         : h('p', { class: 'unverified' }, UNVERIFIED));
   });
   const goals = h('section', { class: `card sage${rv}` },
@@ -84,6 +86,7 @@ export function openGoalSheet(goal, from = null, prefill = 0) {
         bar(p.percent, { gold: true }),
         h('div', { class: 'meta' }, p.reached ? 'Goal reached' : `${formatCents(p.toGo)} to go`),
         howButton(p)) : h('p', { class: 'unverified' }, UNVERIFIED),
+      etaLine(),
 
       h('label', { class: 'field' }, h('span', {}, 'Add money to this goal'),
         h('div', { class: 'inline' },
@@ -105,6 +108,15 @@ export function openGoalSheet(goal, from = null, prefill = 0) {
         h('button', { class: 'btn ghost', onClick: () => { sheet.setTitle('Edit goal'); sheet.setContent(editForm()); } }, 'Edit name or target'),
         h('button', { class: 'btn danger', onClick: confirmDelete }, 'Delete goal')),
     ];
+  }
+
+  // "At this pace, $2,000 by Jun 14", with how it's worked out.
+  function etaLine() {
+    const f = goalForecast(app.state, goal, nowStamp());
+    const text = forecastText(f);
+    if (!text) return null;
+    return h('div', { class: 'field' }, h('span', {}, 'Finish date'),
+      h('div', { class: 'inline' }, h('span', { class: 'grow' }, text), f.receipt ? howButton(f) : null));
   }
 
   function editForm() {

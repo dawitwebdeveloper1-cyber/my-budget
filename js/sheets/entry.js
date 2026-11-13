@@ -6,7 +6,8 @@ import { nowStamp, isStamp, formatDateTime } from '../dates.js';
 import { signed } from '../calc.js';
 import { parseHours, formatHours, hoursPay, splitAcrossGoals, formatPercent } from '../budget.js';
 import { FREQS, REPEAT_CHOICES, alertText } from '../recurring.js';
-import { addEntry, updateEntry, deleteEntry, addRule, editFuture, deleteFuture, PAYCHECK } from '../ops.js';
+import { addEntry, updateEntry, deleteEntry, addRule, editFuture, deleteFuture, PAYCHECK, setTracking, logUse } from '../ops.js';
+import { looksLikeSubscription, costPerUse } from '../decide.js';
 import { cleanEntry, cleanRule } from '../store.js';
 import { receiptBody, openReceipt, howButton } from '../components.js';
 import { addToCalendar } from '../calendar.js';
@@ -39,6 +40,7 @@ export function openEntrySheet(existing = null, preset = {}, { from = null, acti
       ...preset,
     };
   let errors = {};
+  let kindEl = null; // the Bill / Subscription chips (declared before the sheet draws them)
   const title = existing ? 'Edit entry' : 'New entry';
   const isPay = () => d.type === 'income' && d.category === PAYCHECK;
   const sheet = openSheet(title, () => form(), { from });
@@ -93,13 +95,13 @@ export function openEntrySheet(existing = null, preset = {}, { from = null, acti
         h('button', { 'aria-pressed': String(d.payMode === 'amount'), onClick: () => { d.payMode = 'amount'; redraw(); } }, 'Amount'),
         h('button', { 'aria-pressed': String(d.payMode === 'hours'), onClick: () => { d.payMode = 'hours'; redraw(); } }, 'Hours × pay')) : null,
       amountBlock,
-      field('Name', input('name', { maxlength: 80, placeholder: d.type === 'income' ? 'e.g. Paycheck' : d.type === 'refund' ? 'e.g. Walmart return' : 'e.g. Groceries at No Frills' }), 'name'),
+      field('Name', input('name', { maxlength: 80, placeholder: d.type === 'income' ? 'e.g. Paycheck' : d.type === 'refund' ? 'e.g. Walmart return' : 'e.g. Groceries at No Frills', live: autoKind }), 'name'),
       h('div', { class: 'field' }, h('span', {}, d.type === 'refund' ? 'Goes back into' : 'Category'),
         chipGroup('Category', cats.map((c) => [c, c]), d.category, (c) => { d.category = c; redraw(); })),
       !existing && d.type !== 'refund' ? h('div', { class: 'field' }, h('span', {}, 'Repeats'),
         chipGroup('Repeats', [['never', 'Never'], ...REPEAT_CHOICES], d.repeats, setRepeats)) : null,
-      !existing && d.repeats !== 'never' && d.type === 'expense' ? h('div', { class: 'field' }, h('span', {}, 'This is a'),
-        chipGroup('Kind', [['bill', 'Bill'], ['subscription', 'Subscription']], d.kind, (k) => { d.kind = k; redraw(); })) : null,
+      !existing && d.repeats !== 'never' && d.type === 'expense' ? h('div', { class: 'field' }, h('span', {}, 'This is a'), kindChips()) : null,
+      existing ? usesBlock() : null,
       rule ? h('p', { class: 'faint small-note' }, `Repeats ${FREQS[rule.freq].toLowerCase()}. Changes can apply to just this one or all future ones.`) : null,
       h('div', { class: 'two' },
         h('label', { class: 'field' }, h('span', {}, d.repeats !== 'never' ? 'First date' : 'Date'), input('date', { type: 'date' })),
@@ -112,6 +114,36 @@ export function openEntrySheet(existing = null, preset = {}, { from = null, acti
         h('button', { class: 'btn primary', onClick: saveNow }, existing ? 'Save changes' : 'Save'),
         existing ? h('button', { class: 'btn danger', onClick: confirmDelete }, 'Delete entry') : null),
     ];
+  }
+
+  // Bill or subscription: picked from the name (Netflix, gym…) until you choose yourself.
+  function kindChips() {
+    kindEl = chipGroup('Kind', [['bill', 'Bill'], ['subscription', 'Subscription']], d.kind, (k) => { d.kind = k; d.kindTouched = true; redraw(); });
+    return kindEl;
+  }
+  function autoKind() {
+    if (d.kindTouched) return;
+    const k = looksLikeSubscription(d.name) ? 'subscription' : 'bill';
+    if (k === d.kind) return;
+    d.kind = k;
+    if (kindEl?.isConnected) kindEl.replaceWith(kindChips()); // swap the chips in place, so typing isn't interrupted
+  }
+  if (!existing && d.name) autoKind();
+
+  // Cost per use for a one-off purchase of $100 or more: an optional use counter.
+  function usesBlock() {
+    const live = app.state.entries.find((e) => e.id === existing.id) ?? existing;
+    if (rule || live.type !== 'expense') return null;
+    const c = costPerUse(live, nowStamp());
+    const toggle = (on) => { change((st) => setTracking(st, 'entry', existing.id, on), on ? 'Use counter on' : 'Use counter off'); redraw(); };
+    if (!c) {
+      return live.cents >= 10000 ? h('button', { class: 'link', onClick: () => toggle(true) }, 'Count each time I use it (cost per use)') : null;
+    }
+    return h('div', { class: 'field' }, h('span', {}, 'Cost per use'),
+      h('div', { class: 'use-row' },
+        h('div', {}, h('div', { class: 'meta' }, c.ok ? c.text : "Couldn't double-check this"), c.receipt ? howButton(c) : null),
+        h('button', { class: 'btn primary narrow', onClick: () => { const at = nowStamp(); change((st) => logUse(st, 'entry', existing.id, at), `Counted a use of ${live.name}`); redraw(); } }, 'Used it')),
+      h('button', { class: 'link', onClick: () => toggle(false) }, 'Turn the counter off'));
   }
 
   function redraw() { sheet.setTitle(title); sheet.setContent(form()); }
@@ -141,7 +173,8 @@ export function openEntrySheet(existing = null, preset = {}, { from = null, acti
     if (!isStamp(at)) errors.when = 'Pick a date and time';
     if (Object.keys(errors).length) return null;
     return cleanEntry({
-      ...(existing ?? {}),
+      // the saved entry as it is now (a use counted while this form was open is kept)
+      ...(existing ? (app.state.entries.find((e) => e.id === existing.id) ?? existing) : {}),
       id: existing?.id ?? newId(), type: d.type, name: d.name.trim(), cents, at,
       category: d.category, note: d.showNote ? d.note.trim() : '',
       createdAt: existing?.createdAt ?? new Date().toISOString(),

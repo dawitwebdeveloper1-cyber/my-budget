@@ -14,6 +14,9 @@ import { openSettings } from '../sheets/settings.js';
 import { openPaySetup } from '../sheets/paysetup.js';
 import { leftUntilPayday, bigPaycheck, bonusHeadsUp } from '../pay.js';
 import { openGoalSheet } from './goals.js';
+import { openAfford, openWhatIf } from '../sheets/decide.js';
+import { checkupDue } from '../decide.js';
+import { openCheckup } from './reminders.js';
 
 // animate: true when the Home screen opens (count-up, progress fill, chart draw-in).
 export function renderHome(now, animate = false) {
@@ -86,10 +89,14 @@ export function renderHome(now, animate = false) {
     const big2 = bigPaycheck(st, now);
     const bonus = bonusHeadsUp(st, now);
     const dismissed = st.dismissedAdvice;
+    const due = checkupDue(st, now);
+    const checkKey = `checkup:${now.slice(0, 10)}`; // "not now" hides it for today
     const note = big2 && !dismissed.includes(big2.key)
       ? { key: big2.key, text: `This paycheck is ${formatCents(big2.extra)} more than usual. Put some toward a goal?`, action: () => openGoalSheet(st.goals[0] ?? null, null, big2.extra) }
       : bonus && !dismissed.includes(bonus.key) ? bonus
-        : adviceNote({ budgets: categoryBudgets(st, period, now), summary: sum, snapshot, period, now, dismissed });
+        : due.length && !dismissed.includes(checkKey)
+          ? { key: checkKey, text: due.length === 1 ? `Subscription check-up: still using ${due[0].name}?` : `Subscription check-up: still using these ${due.length}?`, action: () => openCheckup() }
+          : adviceNote({ budgets: categoryBudgets(st, period, now), summary: sum, snapshot, period, now, dismissed });
     if (note?.action) {
       advice = h('div', { class: `advice${rv}`, role: 'note' },
         h('button', { class: 'advice-go press', onClick: note.action }, note.text),
@@ -130,7 +137,12 @@ export function renderHome(now, animate = false) {
       row(`Carried over from ${sum.previousLabel}`, sum.carry, sum.carry.value < 0 ? 'out' : 'in'),
       sum.saved.ok && sum.saved.value !== 0 ? row('Moved to savings', sum.saved, 'save') : null));
 
-  return [hero, advice, recapLink, pair, extra, renderRing(sum, motion, rv)];
+  // ---- Decision tools, right under the main card
+  const tools = h('div', { class: `tools${rv}` },
+    h('button', { class: 'tool press', onClick: (e) => openAfford(e.currentTarget) }, icon('receipt'), 'Can I afford it?'),
+    h('button', { class: 'tool press', onClick: (e) => openWhatIf(e.currentTarget) }, icon('leaf'), 'Try a what-if'));
+
+  return [hero, tools, advice, recapLink, pair, extra, renderRing(sum, motion, rv)];
 }
 
 // Budget progress inside the main card: "53% of this month's budget used"
