@@ -50,12 +50,13 @@ export function categoryColour(name) {
 const TINTS = ['sage', 'peach', 'lav'];
 export const tint = (i) => TINTS[i % TINTS.length];
 
-// Friendly empty state: a small icon and a line or two of text.
-export function emptyState(iconName, title, text) {
+// Friendly empty state: a small icon, a line or two of text, and (optionally) one button.
+export function emptyState(iconName, title, text, action = null) {
   return h('div', { class: 'empty' },
     h('span', { class: 'em-ic' }, icon(iconName)),
     title ? h('b', {}, title) : null,
-    text ? h('p', {}, text) : null);
+    text ? h('p', {}, text) : null,
+    action ? h('button', { class: 'btn primary narrow empty-go', onClick: action.run }, action.label) : null);
 }
 
 const signCls = (c, neutral) => (neutral ? '' : c > 0 ? 'in' : c < 0 ? 'out' : '');

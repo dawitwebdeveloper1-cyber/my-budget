@@ -39,8 +39,9 @@ export function payInfo(state, now) {
   if (rule) {
     const { prev, next } = aroundNow(rule, now);
     const candidates = [prev, lastLogged].filter(Boolean).sort();
-    const start = candidates.at(-1) ?? null;
-    return start ? { mode: 'regular', start, next, rule, estimated: false } : null;
+    // Before the very first payday (just set up): everything so far counts as "left from before payday".
+    const start = candidates.at(-1) ?? now;
+    return { mode: 'regular', start, next, rule, estimated: false };
   }
   if (!lastLogged) return null;
   // Irregular: estimate the next payday from the usual gap between recent paychecks.

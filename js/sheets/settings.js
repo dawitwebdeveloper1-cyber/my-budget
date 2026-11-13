@@ -64,8 +64,9 @@ export function openSettings(openSection = null, from = null) {
     return [
       section('money', 'Money', 'Pay, categories, auto-save, month and week', money),
       section('alerts', 'Alerts', `Calendar alerts${st.adviceOn ? ', advice notes on' : ''}${st.logReminder ? ', evening reminder' : ''}`, alerts),
-      section('security', 'Security', hasVault() ? `Passcode on${bioEnabled() ? ' · Face ID on' : ''}` : 'No passcode yet', security),
-      section('backup', 'Backup', st.lastBackupAt ? `Last backup ${formatDate(st.lastBackupAt, { year: true })}` : 'No backup yet', backup),
+      ...(app.sample ? [h('p', { class: 'faint small-note' }, 'Passcode and backup are off while you look around with example data.')] : [
+        section('security', 'Security', hasVault() ? `Passcode on${bioEnabled() ? ' · Face ID on' : ''}` : 'No passcode yet', security),
+        section('backup', 'Backup', st.lastBackupAt ? `Last backup ${formatDate(st.lastBackupAt, { year: true })}` : 'No backup yet', backup)]),
     ];
   }
 

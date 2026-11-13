@@ -7,10 +7,13 @@ export const app = {
   state: freshState(),
   view: { tab: 'home', mode: 'month', anchor: null },
   render: () => {},
+  sample: false, // looking around with example data: nothing is saved
 };
 
 // Saves on this device: encrypted once a passcode is set, never in plain form after that.
+// Example data is never saved.
 export function persist() {
+  if (app.sample) return;
   if (hasVault()) {
     if (isUnlocked()) saveEncrypted(app.state).catch(() => toast("Couldn't save on this device"));
     return;

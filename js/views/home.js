@@ -17,6 +17,7 @@ import { openGoalSheet } from './goals.js';
 import { openAfford, openWhatIf } from '../sheets/decide.js';
 import { checkupDue } from '../decide.js';
 import { weeklyWin } from '../habits.js';
+import { openQuickAdd } from '../sheets/quick.js';
 import { openCheckup } from './reminders.js';
 
 // animate: true when the Home screen opens (count-up, progress fill, chart draw-in).
@@ -52,18 +53,19 @@ export function renderHome(now, animate = false) {
     sub = !lup.next && !lup.info.overdue
       ? h('button', { class: 'perday press', onClick: () => openPaySetup() }, 'Add your payday to see a daily amount ›')
       : h('div', { class: 'perday' },
-      lup.perDay
+      lup.perDay?.value > 0
         ? h('button', { class: 'press', onClick: (e) => openReceipt(lup.perDay, e.currentTarget.closest('.card')) },
           'About ', h('b', { class: 'num' }, formatCents(lup.perDay.value)), ' a day')
         : null,
-      h('span', {}, lup.perDay ? ` · ${when}` : when));
+      h('span', {}, lup.perDay?.value > 0 ? ` · ${when}` : when[0].toUpperCase() + when.slice(1)));
   } else if (lup.reason === 'nopay') {
     sub = h('button', { class: 'perday press', onClick: () => openPaySetup() }, 'Set up your pay to see "Left until payday" ›');
   }
   const casual = casualStatus({ summary: sum, snapshot, progress, period, now });
   const hero = h('section', { class: `card hero${rv}` },
     h('div', { class: 'label' }, lup.ok ? 'Left until payday' : "What's left"),
-    main.ok ? big : h('p', { class: 'unverified' }, UNVERIFIED),
+    // The count-up is for the eyes; screen readers hear the final amount once.
+    main.ok ? [h('span', { class: 'sr' }, formatCents(main.value)), (big.setAttribute('aria-hidden', 'true'), big)] : h('p', { class: 'unverified' }, UNVERIFIED),
     sub,
     casual ? h('div', {}, h('span', { class: 'pill' }, h('span', { class: 'dot' }), casual)) : null,
     heroProgress(progress, motion),
@@ -75,11 +77,13 @@ export function renderHome(now, animate = false) {
 
   // ---- One gentle line at a time: home screen first (keeps data safe), then passcode, backup, advice.
   let advice = null;
-  const backupDays = backupDue(st.settings, st.entries.length > 0, now);
-  if (!isInstalled()) {
-    advice = h('button', { class: `advice action${rv}`, onClick: (e) => openInstallHelp(e.currentTarget) },
-      h('span', {}, 'Add My Budget to your home screen so your data stays safe.'), icon('right'));
-  } else if (!hasVault() && st.entries.length > 0) {
+  const backupDays = app.sample ? null : backupDue(st.settings, st.entries.length > 0, now);
+  if (!isInstalled() && !app.sample && !st.dismissedAdvice.includes('install')) {
+    // A one-time hint: tap for the steps, or dismiss it for good (Settings → Backup keeps the tip).
+    advice = h('div', { class: `advice${rv}`, role: 'note' },
+      h('button', { class: 'advice-go press', onClick: (e) => openInstallHelp(e.currentTarget) }, 'Add My Budget to your home screen so it opens like a real app and your data stays safe. How?'),
+      h('button', { class: 'advice-x', 'aria-label': 'Dismiss this hint', onClick: () => { st.dismissedAdvice.push('install'); persist(); app.render(); } }, icon('close')));
+  } else if (!hasVault() && st.entries.length > 0 && !app.sample) {
     advice = h('button', { class: `advice action${rv}`, onClick: () => openPasscodeSetup() },
       h('span', {}, "Your data isn't locked yet. Set a passcode to encrypt it."), icon('right'));
   } else if (backupDays !== null) {
@@ -147,6 +151,13 @@ export function renderHome(now, animate = false) {
   const tools = h('div', { class: `tools${rv}` },
     h('button', { class: 'tool press', onClick: (e) => openAfford(e.currentTarget) }, icon('receipt'), 'Can I afford it?'),
     h('button', { class: 'tool press', onClick: (e) => openWhatIf(e.currentTarget) }, icon('leaf'), 'Try a what-if'));
+
+  // Nothing logged yet: one friendly line and one button, instead of a page of zeros.
+  if (!st.entries.some((e) => !e.auto && !e.parentId)) {
+    const first = h('section', { class: `card${rv}` }, emptyState('plus', 'Nothing logged yet', 'Add what you spend as you go. It takes a few seconds.',
+      { label: 'Add your first entry', run: () => openQuickAdd() }));
+    return [hero, first, tools, advice, extra];
+  }
 
   return [hero, tools, advice, recapLink, pair, extra, renderRing(sum, motion, rv)];
 }

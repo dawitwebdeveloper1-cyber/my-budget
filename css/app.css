@@ -16,13 +16,13 @@
   --out-bg: #F1E4E4;
   --soft: #ECEEF1;             /* quiet inner boxes: advice line, goal rows */
   --settings-bg: #E3E6EA;
-  --tab-idle: #868C93;
+  --tab-idle: #6B7178;         /* 4.9:1 on white */
   --sage: var(--in-bg);
   --peach: var(--out-bg);
   --lav: var(--soft);
   --text: #1D2125;
   --label: #5A6068;
-  --faint: rgba(29, 33, 37, 0.45);
+  --faint: rgba(29, 33, 37, 0.62); /* placeholders: 4.6:1 */
   --line: rgba(29, 33, 37, 0.08);
   --line-strong: rgba(29, 33, 37, 0.2);
   --field: rgba(29, 33, 37, 0.05);
@@ -62,10 +62,10 @@
     --out-bg: #352628;
     --soft: #282C31;
     --settings-bg: #282C31;
-    --tab-idle: #80878F;
+    --tab-idle: #949BA3;
     --text: #ECEFF2;
     --label: #9EA5AD;
-    --faint: rgba(236, 239, 242, 0.45);
+    --faint: rgba(236, 239, 242, 0.55);
     --line: rgba(236, 239, 242, 0.08);
     --line-strong: rgba(236, 239, 242, 0.2);
     --field: rgba(236, 239, 242, 0.06);
@@ -416,6 +416,27 @@ input[type="date"].input, input[type="time"].input { min-height: 52px; }
 .advice.action svg { width: 16px; height: 16px; flex: none; color: var(--label); }
 .advice-x { flex: none; width: 26px; height: 26px; display: grid; place-items: center; color: var(--label); border-radius: 8px; }
 .advice-x svg { width: 14px; height: 14px; }
+/* Big text (the phone's Text Size setting): scale everything evenly so nothing is cut off */
+html.big-text body { zoom: var(--text-scale, 1); }
+/* First-time setup */
+.setup-shell { padding-bottom: calc(var(--safe-bottom) + 40px); }
+.setup { min-height: calc(100dvh - var(--safe-top) - 80px); display: flex; flex-direction: column; gap: 14px; }
+.setup-top { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; margin: 20px 0 6px; }
+.setup-logo { width: 52px; height: 52px; border-radius: 16px; background: var(--accent); color: var(--on-accent); display: grid; place-items: center; }
+.setup-logo svg { width: 26px; height: 26px; }
+.setup .eyebrow { margin: 0; font-size: 13px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--label); }
+.setup-dots { display: flex; gap: 6px; }
+.setup-dots span { width: 26px; height: 5px; border-radius: 3px; background: var(--line-strong); }
+.setup-dots span.on { background: var(--text); }
+.setup-q { font-size: 28px; font-weight: 800; letter-spacing: -0.02em; line-height: 1.2; margin: 6px 0 4px; }
+.big-money .input { font-size: 30px; font-weight: 800; }
+.center-link { display: block; margin: 4px auto 0; text-align: center; }
+.empty .empty-go { margin-top: 6px; width: auto; padding: 11px 22px; }
+/* Example data: always visible, one tap to leave */
+.sample-bar { position: sticky; top: 0; z-index: 40; display: flex; justify-content: space-between; align-items: center; gap: 10px;
+  padding: calc(var(--safe-top) + 8px) 16px 8px; background: var(--text); color: var(--bg); font-size: 14px; }
+.sample-exit { padding: 6px 14px; border-radius: 999px; background: var(--bg); color: var(--text); font-weight: 800; font-size: 14px; }
+.sample-bar + .shell { padding-top: 14px; }
 /* The streak: small, in the corner, never loud */
 .top-right { display: flex; align-items: center; gap: 8px; }
 .streak { height: 30px; padding: 0 11px; border-radius: 999px; background: var(--settings-bg); color: var(--text); font-size: 13px; font-weight: 800; }

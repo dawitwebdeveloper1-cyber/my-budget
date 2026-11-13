@@ -14,6 +14,7 @@ import { money, howButton, openReceipt, emptyState } from '../components.js';
 import { openEntrySheet } from '../sheets/entry.js';
 import { openRuleSheet } from './reminders.js';
 import { openRecap } from './recap.js';
+import { openQuickAdd } from '../sheets/quick.js';
 
 function activityPeriod(now) {
   const v = app.view;
@@ -78,7 +79,8 @@ export function renderActivity(now, animate = false) {
   items.sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0));
 
   const body = [];
-  if (!items.length) body.push(h('div', { class: `card${rv}` }, emptyState('list', 'Nothing here yet', 'Tap + to add an entry. Press and hold any entry later for quick options.')));
+  if (!items.length) body.push(h('div', { class: `card${rv}` }, emptyState('list', 'Nothing here yet', 'Press and hold any entry later for quick options.',
+    { label: 'Add an entry', run: () => openQuickAdd() })));
   let day = null;
   let group = null;
   for (const it of items) {

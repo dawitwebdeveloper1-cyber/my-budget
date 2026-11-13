@@ -13,7 +13,7 @@ const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 
 const ordinal = (n) => (n === 31 ? 'Last day' : `${n}${n % 100 >= 11 && n % 100 <= 13 ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' }[n % 10] ?? 'th')}`);
 
 // The next date (today or later) that falls on one of the two twice-a-month days.
-function nextSemiDate(days, now) {
+export function nextSemiDate(days, now) {
   const p = parseStamp(now);
   for (let i = 0; i < 3; i++) {
     const idx = p.y * 12 + (p.m - 1) + i;

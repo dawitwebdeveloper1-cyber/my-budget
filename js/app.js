@@ -16,6 +16,8 @@ import { openQuickAdd } from './sheets/quick.js';
 import { openWelcome } from './sheets/welcome.js';
 import { openCheckin } from './sheets/checkin.js';
 import { paydayCheckin, streak, streakText } from './habits.js';
+import { needsSetup, renderSetup } from './views/setup.js';
+import { sampleState } from './sample.js';
 import { openSettings } from './sheets/settings.js';
 
 const TABS = [
@@ -33,6 +35,12 @@ function render(animate = false) {
   const root = document.getElementById('app');
   const now = nowStamp();
   const v = app.view;
+  // Brand-new: the quick setup comes first (no tabs, no + button until it's done or skipped).
+  if (needsSetup(app.state)) {
+    root.replaceChildren(h('main', { class: 'shell setup-shell' }, renderSetup({ onSample: startSample })));
+    if (animate) reveal(root);
+    return;
+  }
   const period = budgetMonth(now, app.state.settings.monthStartDay);
   const screen = {
     home: () => renderHome(now, animate),
@@ -40,10 +48,12 @@ function render(animate = false) {
     goals: () => renderGoals(now, animate),
     reminders: () => renderReminders(now, animate),
   }[v.tab]();
-
   const screenEl = h('div', { class: `screen${animate ? ' enter' : ''}` }, screen);
   screenEl.addEventListener('animationend', () => screenEl.classList.remove('enter'), { once: true });
-  root.replaceChildren(
+  root.replaceChildren(...[
+    app.sample ? h('div', { class: 'sample-bar', role: 'status' },
+      h('span', {}, h('b', {}, 'Example data'), ' · nothing is saved'),
+      h('button', { class: 'sample-exit', onClick: exitSample }, 'Exit')) : null,
     h('main', { class: 'shell' },
       h('header', { class: 'topbar' },
         h('div', {},
@@ -60,11 +70,25 @@ function render(animate = false) {
           class: 'tab', 'aria-current': v.tab === id ? 'page' : null,
           onClick: () => { if (v.tab === id) return; v.tab = id; window.scrollTo({ top: 0, behavior: 'instant' }); render(true); },
         }, icon(ic), label)))),
-  );
+  ].filter(Boolean));
   if (animate) reveal(root);
   celebrate();
 }
 app.render = () => render(false);
+
+// Example data: built in memory, never saved. Exit reloads the app, which removes every trace of it.
+function startSample() {
+  app.sample = true;
+  app.state = sampleState(nowStamp());
+  app.view.tab = 'home';
+  window.scrollTo({ top: 0, behavior: 'instant' });
+  render(true);
+  toast('Example data. Look around and try things; none of it is saved.');
+}
+function exitSample() {
+  app.sample = false;
+  location.reload();
+}
 
 // The streak: small and in the corner, never a big message. Tapping explains how it works.
 function streakPill(now) {
@@ -108,6 +132,7 @@ function catchUp(animate = false) {
 }
 
 function start(state) {
+  app.sample = false; // real data from here on (also after unlocking)
   app.state = state;
   running = true;
   catchUp(true);
@@ -135,6 +160,22 @@ document.addEventListener('visibilitychange', () => {
 
 // Re-check every 30 seconds so entries count right on time.
 setInterval(() => catchUp(false), 30_000);
+
+// Big text: follow the iPhone's Text Size setting (Settings → Display & Brightness → Text Size, and
+// Accessibility → Larger Text). Safari reports it through the "-apple-system-body" font; the default is 17px.
+// The whole app scales with it (up to 1.4×), so nothing gets cut off. Other browsers keep normal size.
+function applyTextSize() {
+  const probe = document.createElement('span');
+  probe.style.cssText = 'position:absolute;visibility:hidden;font:-apple-system-body';
+  document.body.append(probe);
+  const px = probe.style.font ? parseFloat(getComputedStyle(probe).fontSize) : 0;
+  probe.remove();
+  const scale = px > 17 ? Math.min(1.4, Math.round((px / 17) * 100) / 100) : 1;
+  document.documentElement.style.setProperty('--text-scale', String(scale));
+  document.documentElement.classList.toggle('big-text', scale > 1);
+}
+applyTextSize();
+document.addEventListener('visibilitychange', () => { if (!document.hidden) applyTextSize(); });
 
 // Start: open the device storage (moving old data across safely), ask the phone to keep it, then go.
 async function boot() {

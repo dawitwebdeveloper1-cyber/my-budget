@@ -27,6 +27,7 @@ export const DEFAULT_SETTINGS = {
   backupReminder: true,
   lastBackupAt: null,
   logReminder: null,      // "20:00": the evening "Log today?" calendar reminder you added (null = none)
+  setupDone: false,       // the quick first-time setup was finished or skipped
 };
 
 export function freshState() {
@@ -220,6 +221,7 @@ export function cleanState(raw) {
   if ([0, 15, 30, 60, 120].includes(st.alertMinutes)) t.alertMinutes = st.alertMinutes;
   if (typeof st.backupReminder === 'boolean') t.backupReminder = st.backupReminder;
   if (isStamp(st.lastBackupAt)) t.lastBackupAt = st.lastBackupAt;
+  if (st.setupDone === true) t.setupDone = true;
   if (typeof st.logReminder === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(st.logReminder)) t.logReminder = st.logReminder;
   return s;
 }
