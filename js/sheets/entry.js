@@ -6,7 +6,8 @@ import { nowStamp, isStamp, formatDateTime } from '../dates.js';
 import { signed } from '../calc.js';
 import { parseHours, formatHours, hoursPay, splitAcrossGoals, formatPercent } from '../budget.js';
 import { FREQS, REPEAT_CHOICES, alertText } from '../recurring.js';
-import { addEntry, updateEntry, deleteEntry, addRule, editFuture, deleteFuture, PAYCHECK, setTracking, logUse } from '../ops.js';
+import { addEntry, updateEntry, deleteEntry, addRule, editFuture, deleteFuture, PAYCHECK, setTracking, logUse, unmarkRepaid } from '../ops.js';
+import { on } from '../extras.js';
 import { looksLikeSubscription, costPerUse } from '../decide.js';
 import { cleanEntry, cleanRule } from '../store.js';
 import { receiptBody, openReceipt, howButton } from '../components.js';
@@ -22,6 +23,7 @@ function chipGroup(label, options, value, onPick) {
 // opts.from: the tapped row (expands into the form). opts.action 'delete': go straight to the delete confirmation.
 export function openEntrySheet(existing = null, preset = {}, { from = null, action = null } = {}) {
   if (existing?.type === 'saving') { openSavingSheet(existing, { from, action }); return; }
+  if (existing?.type === 'repaid') { openRepaidSheet(existing, { from }); return; }
   const s = app.state;
   const now = nowStamp();
   const rule = existing?.recurringId ? s.recurring.find((r) => r.id === existing.recurringId) : null;
@@ -32,11 +34,13 @@ export function openEntrySheet(existing = null, preset = {}, { from = null, acti
       repeats: 'never', kind: 'bill', timeTouched: true,
       payMode: existing.hours ? 'hours' : 'amount',
       hours: existing.hours ? formatHours(existing.hours) : '', rate: existing.rateCents ? centsToInput(existing.rateCents) : '',
+      owed: existing.owed ? centsToInput(existing.owed) : '', showSplit: !!existing.owed, cash: !!existing.cash,
     }
     : {
       type: 'expense', name: '', amount: '', category: s.categories.expense[0], date: now.slice(0, 10), time: now.slice(11),
       note: '', showNote: false, repeats: 'never', kind: 'bill', timeTouched: false, payMode: 'amount', hours: '',
       rate: s.settings.hourlyRateCents ? centsToInput(s.settings.hourlyRateCents) : '',
+      owed: '', showSplit: false, cash: false,
       ...preset,
     };
   let errors = {};
@@ -95,6 +99,8 @@ export function openEntrySheet(existing = null, preset = {}, { from = null, acti
         h('button', { 'aria-pressed': String(d.payMode === 'amount'), onClick: () => { d.payMode = 'amount'; redraw(); } }, 'Amount'),
         h('button', { 'aria-pressed': String(d.payMode === 'hours'), onClick: () => { d.payMode = 'hours'; redraw(); } }, 'Hours × pay')) : null,
       amountBlock,
+      splitBlock(),
+      cashBox(),
       field('Name', input('name', { maxlength: 80, placeholder: d.type === 'income' ? 'e.g. Paycheck' : d.type === 'refund' ? 'e.g. Walmart return' : 'e.g. Groceries at No Frills', live: autoKind }), 'name'),
       h('div', { class: 'field' }, h('span', {}, d.type === 'refund' ? 'Goes back into' : 'Category'),
         chipGroup('Category', cats.map((c) => [c, c]), d.category, (c) => { d.category = c; redraw(); })),
@@ -114,6 +120,31 @@ export function openEntrySheet(existing = null, preset = {}, { from = null, acti
         h('button', { class: 'btn primary', onClick: saveNow }, existing ? 'Save changes' : 'Save'),
         existing ? h('button', { class: 'btn danger', onClick: confirmDelete }, 'Delete entry') : null),
     ];
+  }
+
+  // Split bills (an extra): you paid it all, friends owe you part. Only your share counts as spending.
+  function splitBlock() {
+    if (d.type !== 'expense' || d.repeats !== 'never' || !(on(s, 'splits') || existing?.owed)) return null;
+    if (!d.showSplit) return h('button', { class: 'link', onClick: () => { d.showSplit = true; redraw(); } }, 'Split with friends');
+    const repaid = existing && app.state.entries.find((e) => e.type === 'repaid' && e.splitOf === existing.id);
+    return [
+      h('label', { class: 'field' }, h('span', {}, 'Friends owe you'),
+        h('div', { class: 'money-input' }, h('span', { class: 'cur' }, '$'),
+          h('input', { class: 'input', inputmode: 'decimal', placeholder: '0.00', value: d.owed, onInput: (ev) => { d.owed = ev.target.value; } }))),
+      errors.owed ? h('p', { class: 'error' }, errors.owed) : null,
+      h('p', { class: 'faint small-note' }, repaid
+        ? `They paid you back on ${formatDateTime(repaid.at)}.`
+        : 'Only your share counts as spending. The rest shows as "Owed to you" until they pay you back.'),
+      h('button', { class: 'link', onClick: () => { d.showSplit = false; d.owed = ''; redraw(); } }, 'Not split'),
+    ];
+  }
+
+  // Cash (an extra): tag what you paid or got in cash, for "cash on hand".
+  function cashBox() {
+    if ((d.type !== 'expense' && d.type !== 'income') || !(on(s, 'cash') || existing?.cash)) return null;
+    const box = h('input', { type: 'checkbox', id: 'is-cash', checked: d.cash });
+    box.addEventListener('change', () => { d.cash = box.checked; });
+    return h('label', { class: 'check', for: 'is-cash' }, box, h('span', {}, d.type === 'income' ? 'Got it in cash' : 'Paid with cash'));
   }
 
   // Bill or subscription: picked from the name (Netflix, gym…) until you choose yourself.
@@ -137,7 +168,7 @@ export function openEntrySheet(existing = null, preset = {}, { from = null, acti
     const c = costPerUse(live, nowStamp());
     const toggle = (on) => { change((st) => setTracking(st, 'entry', existing.id, on), on ? 'Use counter on' : 'Use counter off'); redraw(); };
     if (!c) {
-      return live.cents >= 10000 ? h('button', { class: 'link', onClick: () => toggle(true) }, 'Count each time I use it (cost per use)') : null;
+      return live.cents >= 10000 && on(s, 'costPerUse') ? h('button', { class: 'link', onClick: () => toggle(true) }, 'Count each time I use it (cost per use)') : null;
     }
     return h('div', { class: 'field' }, h('span', {}, 'Cost per use'),
       h('div', { class: 'use-row' },
@@ -171,6 +202,12 @@ export function openEntrySheet(existing = null, preset = {}, { from = null, acti
     if (!d.name.trim()) errors.name = 'Give it a name';
     const at = `${d.date}T${(d.time || '').slice(0, 5)}`;
     if (!isStamp(at)) errors.when = 'Pick a date and time';
+    let owed;
+    if (d.type === 'expense' && d.showSplit && d.owed.trim()) {
+      owed = parseAmount(d.owed) ?? undefined;
+      if (!owed) errors.owed = 'Enter what friends owe you, like 30';
+      else if (cents !== null && owed >= cents) errors.owed = `That's the whole ${formatCents(cents)}. What friends owe has to be less than what you paid.`;
+    }
     if (Object.keys(errors).length) return null;
     return cleanEntry({
       // the saved entry as it is now (a use counted while this form was open is kept)
@@ -178,7 +215,7 @@ export function openEntrySheet(existing = null, preset = {}, { from = null, acti
       id: existing?.id ?? newId(), type: d.type, name: d.name.trim(), cents, at,
       category: d.category, note: d.showNote ? d.note.trim() : '',
       createdAt: existing?.createdAt ?? new Date().toISOString(),
-      hours, rateCents,
+      hours, rateCents, owed, cash: d.cash && (d.type === 'expense' || d.type === 'income'),
     });
   }
 
@@ -281,6 +318,21 @@ export function openEntrySheet(existing = null, preset = {}, { from = null, acti
         : h('button', { class: 'btn primary', onClick: done((st) => deleteEntry(st, existing.id)) }, 'Delete'),
       h('button', { class: 'btn ghost', onClick: redraw }, 'Keep it')));
   }
+}
+
+// Friends paying you back for a split bill.
+function openRepaidSheet(entry, { from = null } = {}) {
+  const bill = app.state.entries.find((e) => e.id === entry.splitOf);
+  const sheet = openSheet('Paid back', () => [
+    h('div', { class: 'confirm-card' },
+      h('div', { class: 'big num in' }, icon('up', 'arrow'), formatCents(entry.cents, { sign: 'always' })),
+      h('div', { class: 'what' }, `Friends paid you back for ${entry.name}`),
+      h('div', { class: 'meta' }, formatDateTime(entry.at)),
+      h('div', { class: 'meta' }, 'Not income: it\'s your own money coming back.')),
+    h('div', { class: 'actions' },
+      bill ? h('button', { class: 'btn ghost', onClick: () => { sheet.close(); openEntrySheet(bill); } }, 'Open the bill') : null,
+      h('button', { class: 'btn danger', onClick: () => { change((st) => unmarkRepaid(st, entry.splitOf), 'Marked as not paid back'); sheet.close(); } }, 'Not paid back yet')),
+  ], { from });
 }
 
 // Money moved to a savings goal.

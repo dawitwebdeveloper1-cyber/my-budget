@@ -6,6 +6,7 @@ import { FREQS, KINDS, REPEAT_CHOICES, nextOccurrence, upcoming, alertText } fro
 import { activeRules, editRule, stopRule, logUse, markChecked, setTracking } from '../ops.js';
 import { money, emptyState, howButton, openReceipt } from '../components.js';
 import { subscriptionTotal, checkupDue, trackedItems, costPerUse, yearlyCost } from '../decide.js';
+import { on } from '../extras.js';
 import { addToCalendar } from '../calendar.js';
 import { openEntrySheet } from '../sheets/entry.js';
 
@@ -36,12 +37,12 @@ export function renderReminders(now, animate = false) {
     h('button', { class: 'sub-total', onClick: (e) => total.ok && openReceipt(total, e.currentTarget) },
       h('span', {}, `Your ${total.count === 1 ? 'subscription costs' : `${total.count} subscriptions cost`}`),
       total.ok ? h('b', { class: 'num' }, `${formatCents(total.value)} a year`) : h('span', { class: 'unverified' }, 'Hidden')),
-    due.length ? h('button', { class: 'advice action', onClick: () => openCheckup() },
+    due.length && on(st, 'nudges') ? h('button', { class: 'advice action', onClick: () => openCheckup() },
       h('span', {}, `Check-up: still using ${due.length === 1 ? due[0].name : `these ${due.length}`}?`), icon('right')) : null) : null;
 
   // Cost per use: anything with a use counter turned on.
   const tracked = trackedItems(st);
-  const usesCard = tracked.length ? h('section', { class: `card${rv}` },
+  const usesCard = tracked.length && on(st, 'costPerUse') ? h('section', { class: `card${rv}` },
     h('h2', {}, 'Cost per use'),
     h('div', {}, tracked.map(({ kind, item }) => useRow(kind, item, now)))) : null;
 
@@ -119,7 +120,7 @@ export function openRuleSheet(rule, from = null) {
         h('div', { class: 'meta' }, `${KINDS[rule.kind]} · ${FREQS[rule.freq]} · ${rule.category}`)),
       dates.length ? h('div', { class: 'field' }, h('span', {}, 'Coming up'),
         h('ul', { class: 'facts' }, dates.map((d) => h('li', {}, formatDateTime(d))))) : null,
-      rule.kind === 'subscription' ? counter() : null,
+      rule.kind === 'subscription' && on(st, 'costPerUse') ? counter() : null,
       h('div', { class: 'actions' },
         rule.type === 'expense' ? h('button', { class: 'btn primary', onClick: () => addToCalendar(rule) }, 'Add to Calendar') : null,
         rule.type === 'expense' ? h('p', { class: 'faint small-note center' }, `Alerts ${alertText(st.settings)}, every time.`) : null,

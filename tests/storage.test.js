@@ -122,14 +122,14 @@ test('version 3 data: one-goal auto-save becomes the new per-goal list, past pay
   assert.equal(s.entries.find((e) => e.id === 's').cents, 8000, 'saved amounts untouched');
 });
 
-test('version 4 data opens as version 5; use counters and check-up dates are kept, bad ones dropped', () => {
+test('version 4 data opens as the current version; use counters and check-up dates are kept, bad ones dropped', () => {
   const v4 = {
     version: 4,
     recurring: [{ id: 'r', type: 'expense', kind: 'subscription', name: 'Gym', cents: 4500, category: 'Health', freq: 'monthly', anchor: '2026-11-01T09:00', nextIndex: 1, endAt: null,
       uses: ['2026-11-03T18:00', 'nope', '2026-11-02T18:00'], checkedAt: '2026-11-01T10:00' }],
     entries: [{ id: 'b', type: 'expense', name: 'Bike', cents: 60000, at: '2026-10-01T12:00', category: 'Transport', note: '', uses: ['2026-10-05T08:00'] }],
   };
-  assert.equal(upgradeRaw(v4).version, 5);
+  assert.equal(upgradeRaw(v4).version, DATA_VERSION);
   const s = fromSaved(v4);
   assert.equal(s.version, DATA_VERSION);
   assert.deepEqual(s.recurring[0].uses, ['2026-11-02T18:00', '2026-11-03T18:00']);
@@ -189,9 +189,9 @@ test('unreadable saved data is kept as a copy, never silently thrown away', asyn
 test('every version converts step by step', () => {
   assert.equal(savedVersion({}), 1);
   assert.equal(savedVersion({ version: 2 }), 2);
-  assert.equal(DATA_VERSION, 5);
+  assert.equal(DATA_VERSION, 6);
   assert.equal(upgradeRaw({ entries: [] }).version, DATA_VERSION);
-  assert.equal(upgradeRaw({ version: 2, entries: [] }).version, 5);
+  assert.equal(upgradeRaw({ version: 2, entries: [] }).version, 6);
   assert.equal(freshState().version, DATA_VERSION, 'new data starts at the current version');
   assert.equal(fromSaved(JSON.parse(STAGE1)).entries.length, 2);
 });

@@ -7,7 +7,7 @@ import { FREQS, ALERT_DAY_OPTIONS, ALERT_MIN_OPTIONS, nextOccurrence, alertTrigg
 import { parsePercent, formatPercent } from '../budget.js';
 import { activeRules, renameCategory, deleteCategory, addCategory, PAYCHECK } from '../ops.js';
 import { hasVault, bioEnabled, bioAvailable, enableBio, disableBio, adoptBackup } from '../vault.js';
-import { parseBackup, readBackup } from '../backup.js';
+import { parseBackup, readBackup, backupAge } from '../backup.js';
 import { listCopies, restoreCopy } from '../store.js';
 import { isPersisted, flushStorage } from '../storage.js';
 import { openPasscodeSetup, openChangePasscode, openNewRecoveryKey } from '../lock.js';
@@ -19,6 +19,7 @@ import { payRule } from '../pay.js';
 import { addToCalendar } from '../calendar.js';
 import { exportBackupNow, openBackupCheck, exportSpreadsheet, openPrivacy } from './backup.js';
 import { LOCK_CHOICES, undoImport } from '../trust.js';
+import { EXTRAS, on } from '../extras.js';
 import { openStory, openFeedback, shareApp } from './about.js';
 import { APP_VERSION, FEEDBACK_EMAIL } from '../config.js';
 
@@ -68,10 +69,11 @@ export function openSettings(openSection = null, from = null) {
     const st = app.state.settings;
     return [
       section('money', 'Money', 'Pay, categories, auto-save, month and week', money),
-      section('alerts', 'Alerts', `Calendar alerts${st.adviceOn ? ', advice notes on' : ''}${st.logReminder ? ', evening reminder' : ''}`, alerts),
+      section('alerts', 'Alerts', `Calendar alerts${st.logReminder ? ', evening reminder' : ''}`, alerts),
+      section('extras', 'Extras', extrasSummary(), extras),
       ...(app.sample ? [h('p', { class: 'faint small-note' }, 'Passcode and backup are off while you look around with example data.')] : [
         section('security', 'Security', hasVault() ? `Passcode on${bioEnabled() ? ' · Face ID on' : ''}` : 'No passcode yet', security),
-        section('backup', 'Backup', st.lastBackupAt ? `Last backup ${formatDate(st.lastBackupAt, { year: true })}` : 'No backup yet', backup)]),
+        section('backup', 'Backup', backupAge(st.lastBackupAt, nowStamp()), backup)]),
       h('button', { class: 'set-privacy', onClick: (e) => openPrivacy(e.currentTarget) },
         h('span', {}, h('b', {}, 'Your privacy'), h('span', { class: 'faint small' }, ' · your data stays on your phone')), icon('right')),
       FEEDBACK_EMAIL ? h('button', { class: 'set-privacy', onClick: () => openFeedback() },
@@ -195,8 +197,27 @@ export function openSettings(openSection = null, from = null) {
       line('Second alert', select(ALERT_MIN_OPTIONS, st.alertMinutes, (v) => setS('alertMinutes', Number(v)), 'Second alert')),
       line('Reminder time for bills', select(Array.from({ length: 17 }, (_, i) => [i + 6, hourLabel(i + 6)]), st.eventHour, (v) => setS('eventHour', Number(v)), 'Reminder time')),
       h('p', { class: 'faint small-note' }, 'Applies to calendar reminders you add from now on. To update one you already added, tap it in Reminders and add it again.'),
-      line('Gentle advice notes', toggle(st.adviceOn, (on) => setS('adviceOn', on), 'Advice notes')),
       ...logReminder(),
+    ];
+  }
+
+  // ---------- Extras ----------
+  // Everything beyond the basics can be switched on or off. Basics: quick add, Left until payday,
+  // goals, show me how, and Can I afford it?
+  function extrasSummary() {
+    const n = EXTRAS.filter(([k]) => on(app.state, k)).length;
+    return n ? `${n} of ${EXTRAS.length} on` : 'Only the basics';
+  }
+  function extras() {
+    return [
+      h('p', { class: 'faint small-note' }, 'The basics are always on: quick add, Left until payday, goals, "show me how" and "Can I afford it?". Turn on only what helps you.'),
+      ...EXTRAS.map(([key, label, about]) => line(label, toggle(on(app.state, key), (v) => {
+        change((x) => {
+          x.settings.extras = { ...(x.settings.extras ?? {}), [key]: v };
+          if (key === 'nudges') x.settings.adviceOn = v;
+        }, `${label} ${v ? 'on' : 'off'}`);
+        redraw();
+      }, label), about)),
     ];
   }
 
@@ -288,7 +309,7 @@ export function openSettings(openSection = null, from = null) {
       h('p', { class: 'dim' }, hasVault()
         ? 'Saves everything into one encrypted file. It opens with your passcode or recovery key. Keep it in Files, iCloud Drive or email it to yourself.'
         : 'Saves everything into one file. Set a passcode first if you want the file encrypted.'),
-      h('p', { class: 'faint small-note' }, st.lastBackupAt ? `Last backup: ${formatDate(st.lastBackupAt, { weekday: true, year: true })}` : 'No backup yet.'),
+      h('p', { class: 'faint small-note' }, st.lastBackupAt ? `${backupAge(st.lastBackupAt, nowStamp())} (${formatDate(st.lastBackupAt, { weekday: true, year: true })})` : 'No backup yet.'),
       h('div', { class: 'actions' },
         h('button', { class: 'btn primary', onClick: async () => { if (await exportBackupNow()) redraw(); } }, 'Export backup'),
         h('button', { class: 'btn ghost', onClick: () => openBackupCheck() }, 'Check a backup works'),

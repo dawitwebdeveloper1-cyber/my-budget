@@ -7,7 +7,7 @@ import { decryptData } from './crypto.js';
 import { fromSaved } from './store.js';
 
 // ---------- Spreadsheet export (CSV: opens in Numbers, Excel and Google Sheets) ----------
-const TYPE_LABEL = { income: 'Money in', expense: 'Money out', saving: 'To savings', refund: 'Refund' };
+const TYPE_LABEL = { income: 'Money in', expense: 'Money out', saving: 'To savings', refund: 'Refund', repaid: 'Paid back' };
 
 // A cell, quoted when needed. Text that a spreadsheet would treat as a formula (=, +, -, @) gets a
 // leading apostrophe, so opening the file can never run anything.
@@ -27,13 +27,14 @@ export function centsText(c) {
 export function toCSV(state, now) {
   const goals = new Map(state.goals.map((g) => [g.id, g.name]));
   const rules = new Map(state.recurring.map((r) => [r.id, r.name]));
-  const rows = [['Date', 'Time', 'Type', 'Name', 'Category', 'Amount', 'Goal', 'Repeating', 'Note']];
+  const rows = [['Date', 'Time', 'Type', 'Name', 'Category', 'Amount', 'Owed to you', 'Cash', 'Goal', 'Repeating', 'Note']];
   const list = state.entries.filter((e) => e.at <= now).sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0));
   for (const e of list) {
-    const signed = e.type === 'income' || e.type === 'refund' ? e.cents : -e.cents;
+    const signed = e.type === 'income' || e.type === 'refund' || e.type === 'repaid' ? e.cents : -e.cents;
     rows.push([
       cell(e.at.slice(0, 10)), cell(formatTime(e.at)), cell(TYPE_LABEL[e.type] ?? e.type), cell(e.name), cell(e.category),
-      cell(centsText(signed), { text: false }), cell(goals.get(e.goalId) ?? ''), cell(rules.get(e.recurringId) ?? ''), cell(e.note ?? ''),
+      cell(centsText(signed), { text: false }), e.owed ? cell(centsText(e.owed), { text: false }) : '', e.cash ? 'Yes' : '',
+      cell(goals.get(e.goalId) ?? ''), cell(rules.get(e.recurringId) ?? ''), cell(e.note ?? ''),
     ]);
   }
   // Excel on Windows needs the byte-order mark to read accents (é, ü) correctly.

@@ -418,6 +418,18 @@ input[type="date"].input, input[type="time"].input { min-height: 52px; }
 .advice-x svg { width: 14px; height: 14px; }
 /* Big text (the phone's Text Size setting): scale everything evenly so nothing is cut off */
 html.big-text body { zoom: var(--text-scale, 1); }
+/* "New version ready": a calm bar above the tabs, refreshes only when tapped */
+.update-bar { position: fixed; left: 16px; right: 16px; bottom: calc(var(--tabbar-h) + var(--safe-bottom) + 14px); z-index: 55;
+  display: flex; justify-content: space-between; align-items: center; gap: 10px; max-width: 508px; margin: 0 auto;
+  padding: 13px 16px; border-radius: 18px; background: var(--text); color: var(--bg); font-size: 14.5px; box-shadow: var(--shadow-lift); text-align: left; }
+.update-bar svg { width: 16px; height: 16px; flex: none; }
+.tools.single { grid-template-columns: 1fr; }
+.home-rows { background: var(--surface); border-radius: 22px; padding: 2px 18px; box-shadow: var(--shadow); margin-bottom: 14px; }
+.home-rows .row { display: flex; align-items: center; gap: 10px; }
+.home-rows .row .name { flex: 1; display: flex; flex-direction: column; align-items: flex-start; }
+.home-rows .row-sub { margin-top: 2px; }
+.home-rows .row svg { width: 16px; height: 16px; color: var(--label); flex: none; }
+.load-more { margin: 8px auto 20px; }
 /* First-time setup */
 .setup-shell { padding-bottom: calc(var(--safe-bottom) + 40px); }
 .setup { min-height: calc(100dvh - var(--safe-top) - 80px); display: flex; flex-direction: column; gap: 14px; }

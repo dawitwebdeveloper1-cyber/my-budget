@@ -2,7 +2,7 @@
 // Same rules as everywhere else: whole cents, every answer worked out two ways, receipts that add up.
 
 import { sumCents, formatCents } from './money.js';
-import { checked, receiptMatches } from './calc.js';
+import { checked, receiptMatches, isSpending, spendCents } from './calc.js';
 import { parseStamp, makeStamp, addDays, formatDate } from './dates.js';
 import { goalProgress, splitAcrossGoals } from './budget.js';
 import { leftUntilPayday, usualPaycheck, futurePaydays, usualLeftover, dayNum } from './pay.js';
@@ -191,8 +191,8 @@ export function usualCategorySpend(state, now, category) {
   const lo = usualLeftover(state, now);
   if (!lo?.ok) return null;
   const totals = lo.periods.map((p) => sumCents(state.entries
-    .filter((e) => e.at >= p.from && e.at < p.to && e.category === category && (e.type === 'expense' || e.type === 'refund'))
-    .map((e) => (e.type === 'expense' ? e.cents : -e.cents))));
+    .filter((e) => e.at >= p.from && e.at < p.to && e.category === category && isSpending(e))
+    .map(spendCents)));
   return Math.max(0, Math.floor(sumCents(totals) / totals.length));
 }
 

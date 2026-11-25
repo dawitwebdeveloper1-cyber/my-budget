@@ -194,10 +194,16 @@ export function openPasscodeSetup() {
         h('button', { class: 'btn ghost', onClick: () => finish() }, 'Not now')));
   }
 
+  // Last step: a backup made with the new passcode (skippable, since the recovery key also gets you back in).
   function finish(extra) {
-    sheet.close();
     app.render();
-    toast(extra ? `Passcode set · ${extra}` : 'Passcode set. Your data is now encrypted.');
+    sheet.setTitle('Save a backup now?');
+    sheet.setContent(
+      h('p', { class: 'dim' }, `Passcode set${extra ? ` · ${extra}` : ''}. Your data is now encrypted.`),
+      h('p', { class: 'dim' }, 'A backup is your safety net if this phone is lost. It\'s encrypted with your new passcode, and your recovery key opens it too.'),
+      h('div', { class: 'actions' },
+        h('button', { class: 'btn primary', onClick: async () => { sheet.close(); const { exportBackupNow } = await import('./sheets/backup.js'); exportBackupNow(); } }, 'Save a backup now'),
+        h('button', { class: 'btn ghost', onClick: () => { sheet.close(); toast('Passcode set. Your data is now encrypted.'); } }, 'Later')));
   }
 }
 

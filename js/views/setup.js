@@ -9,6 +9,9 @@ import { addRule, PAYCHECK } from '../ops.js';
 import { cleanRule, cleanGoal } from '../store.js';
 import { nextSemiDate } from '../sheets/paysetup.js';
 
+// Opened from the home screen icon (not inside Safari)?
+const isInstalled = () => (typeof matchMedia === 'function' && matchMedia('(display-mode: standalone)').matches) || globalThis.navigator?.standalone === true;
+
 // Brand-new: nothing saved yet and setup never finished or skipped.
 export function needsSetup(st) {
   return !app.sample && !st.settings.setupDone && !st.entries.length && !st.recurring.length && !st.goals.length;
@@ -43,6 +46,8 @@ export function renderSetup({ onSample }) {
         go(d.freq === 'irregular' ? 3 : 2);
       } }, 'Next')),
       h('button', { class: 'link center-link', onClick: onSample }, 'Just look around with example data first'),
+      // The most important tip for keeping data safe on an iPhone.
+      !isInstalled() ? h('p', { class: 'faint small-note center' }, 'Tip: in Safari, tap Share → Add to Home Screen. Your iPhone keeps the app\'s data safe that way, and it opens like a real app.') : null,
     ];
   } else if (d.step === 2) {
     body = [

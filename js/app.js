@@ -19,6 +19,7 @@ import { paydayCheckin, streak, streakText } from './habits.js';
 import { needsSetup, renderSetup } from './views/setup.js';
 import { sampleState } from './sample.js';
 import { lockDelayMs } from './trust.js';
+import { on } from './extras.js';
 import { openShareCard, milestoneOf } from './sharecard.js';
 import { whatsNewDue, openWhatsNew } from './sheets/about.js';
 import { openSettings } from './sheets/settings.js';
@@ -96,6 +97,7 @@ function exitSample() {
 
 // The streak: small and in the corner, never a big message. Tapping explains how it works.
 function streakPill(now) {
+  if (!on(app.state, 'streak')) return null;
   const s = streak(app.state, now, app.state.settings.weekStartDay);
   const text = streakText(s);
   if (!text) return null;
@@ -148,7 +150,7 @@ function catchUp(animate = false) {
   if (added.length) persist();
   render(animate);
   // On payday, the check-in takes the place of "Added since your last visit".
-  const checkin = paydayCheckin(app.state, nowStamp());
+  const checkin = on(app.state, 'checkin') && !app.sample ? paydayCheckin(app.state, nowStamp()) : null;
   if (checkin) openCheckin(checkin);
   else if (app.state.notice.length) openWelcome();
   else if (animate) { const news = whatsNewDue(app.state); if (news) openWhatsNew(news); } // once after an update
@@ -210,5 +212,20 @@ async function boot() {
 boot();
 
 if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
-  navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).catch(() => {});
+  const hadController = !!navigator.serviceWorker.controller;
+  navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' })
+    .then((reg) => {
+      // Look for a newer version whenever the app comes back to the front.
+      document.addEventListener('visibilitychange', () => { if (!document.hidden) reg.update().catch(() => {}); });
+    })
+    .catch(() => {});
+  // A new version has taken over: say so, and refresh only when you tap (never in the middle of typing).
+  navigator.serviceWorker.addEventListener('controllerchange', () => { if (hadController) showUpdateReady(); });
+}
+
+function showUpdateReady() {
+  if (document.querySelector('.update-bar')) return;
+  const bar = h('button', { class: 'update-bar', role: 'status', onClick: () => location.reload() },
+    h('span', {}, h('b', {}, 'New version ready'), ' · tap to refresh'), icon('right'));
+  document.body.append(bar);
 }

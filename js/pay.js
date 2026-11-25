@@ -2,7 +2,7 @@
 // Same rules as everywhere else: whole cents, worked out two ways, receipts that add up exactly.
 
 import { sumCents, formatCents } from './money.js';
-import { checked, receiptMatches, signed, isSpending } from './calc.js';
+import { checked, receiptMatches, signed, isSpending, spendCents, owedFlow, entryLines } from './calc.js';
 import { occurrenceAt, isActiveAt } from './recurring.js';
 import { parseStamp, makeStamp, addDays, formatDate } from './dates.js';
 import { activeRules, isPaycheck } from './ops.js';
@@ -91,9 +91,11 @@ export function leftUntilPayday(state, now) {
   const carryA = sumCents(counted.filter((e) => e.at < start).map(signed));
   const inA = sumCents(inPeriod.filter((e) => e.type === 'income').map((e) => e.cents));
   const savedA = sumCents(inPeriod.filter((e) => e.type === 'saving').map((e) => e.cents));
-  const spentA = sumCents(inPeriod.filter(isSpending).map((e) => (e.type === 'expense' ? e.cents : -e.cents)));
+  // Spending (your share), the friends' part of split bills, and repayments: all by what left or came back.
+  const spentA = sumCents(inPeriod.filter(isSpending).map(spendCents));
+  const owedA = sumCents(inPeriod.map(owedFlow));
   const billsA = sumCents(bills.map((b) => b.cents));
-  const leftA = carryA + inA - savedA - spentA - billsA;
+  const leftA = carryA + inA - savedA - spentA + owedA - billsA;
 
   // Way B: your balance right now (one pass over everything), minus what's set aside.
   let balance = 0;
@@ -110,9 +112,7 @@ export function leftUntilPayday(state, now) {
     title: 'Left until payday', totalLabel: 'Left until payday',
     lines: [
       ...(carryA ? [{ label: 'Left from before payday', cents: carryA, type: 'carry' }] : []),
-      ...inPeriod.map((e) => ({
-        label: e.type === 'refund' ? `Refund: ${e.name}` : e.name, at: e.at, cents: signed(e), type: e.type, category: e.category,
-      })),
+      ...inPeriod.flatMap(entryLines),
       ...bills.map((b) => ({ label: `Due before payday: ${b.name}`, at: b.at, cents: -b.cents, type: 'expense', category: b.category })),
     ],
   };

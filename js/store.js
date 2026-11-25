@@ -6,6 +6,7 @@ import { getItem, setItem, removeItem, keys } from './storage.js';
 import { MAX_ENTRY_CENTS } from './money.js';
 import { TYPES } from './calc.js';
 import { FREQS, KINDS } from './recurring.js';
+import { extrasOff, extrasAsBefore, EXTRA_KEYS } from './extras.js';
 
 const KEY = 'mybudget.v1';
 
@@ -20,7 +21,7 @@ export const DEFAULT_SETTINGS = {
   autoSave: [],           // [{ goalId, bp }]: each goal's share of every paycheck (1000 bp = 10%)
   payMode: 'schedule',    // 'schedule' (a repeating paycheck) or 'irregular' (gig work, changing shifts)
   hourlyRateCents: null,  // remembered for the paycheck logger
-  adviceOn: true,
+  adviceOn: false,        // follows extras.nudges (kept for older code and backups)
   eventHour: 9,           // calendar events at 9:00 AM
   alertDays: 1,           // calendar alert: 1 day before
   alertMinutes: 60,       // and 1 hour before
@@ -31,11 +32,13 @@ export const DEFAULT_SETTINGS = {
   lockAfter: 1,           // minutes in the background before the passcode is asked again (0 = right away)
   backupChecked: false,   // a backup file has been checked (opened and compared) at least once
   seenVersion: null,      // the app version whose "What's new" was already shown
+  extras: extrasOff(),    // optional extras (streak, notes, weekly wins…): off for new people
+  cash: null,             // { cents, at }: the cash you last counted (the Cash extra)
 };
 
 export function freshState() {
   return {
-    version: 5, // keep equal to DATA_VERSION
+    version: 6, // keep equal to DATA_VERSION
     entries: [],
     recurring: [],
     goals: [],
@@ -110,6 +113,10 @@ export function cleanEntry(e) {
   if (Number.isInteger(e.bp) && e.bp >= 0 && e.bp <= 10000) out.bp = e.bp;
   if (Array.isArray(e.autoSave)) out.autoSave = cleanPlan(e.autoSave);
   if (Array.isArray(e.uses)) out.uses = cleanUses(e.uses);
+  // A split bill: the part friends owe (less than the whole). A repayment points back to its bill.
+  if (out.type === 'expense' && Number.isSafeInteger(e.owed) && e.owed > 0 && e.owed < out.cents) out.owed = e.owed;
+  if (out.type === 'repaid') { const so = optStr(e.splitOf, 64); if (!so) return null; out.splitOf = so; }
+  if (e.cash === true && (out.type === 'expense' || out.type === 'income')) out.cash = true;
   if (e.imported === true) out.imported = true;
   const ik = optStr(e.importKey, 200);
   if (ik) out.importKey = ik;
@@ -241,6 +248,10 @@ export function cleanState(raw) {
   if (st.setupDone === true) t.setupDone = true;
   if ([0, 1, 5, 15].includes(st.lockAfter)) t.lockAfter = st.lockAfter;
   if (st.backupChecked === true) t.backupChecked = true;
+  t.extras = extrasOff();
+  if (st.extras && typeof st.extras === 'object') for (const k of EXTRA_KEYS) if (st.extras[k] === true) t.extras[k] = true;
+  t.adviceOn = t.extras.nudges; // the old switch follows the new one
+  if (st.cash && Number.isSafeInteger(st.cash.cents) && Math.abs(st.cash.cents) <= MAX_ENTRY_CENTS && isStamp(st.cash.at)) t.cash = { cents: st.cash.cents, at: st.cash.at };
   if (typeof st.seenVersion === 'string' && /^[\w.-]{1,20}$/.test(st.seenVersion)) t.seenVersion = st.seenVersion;
   if (typeof st.logReminder === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(st.logReminder)) t.logReminder = st.logReminder;
   return s;
@@ -255,7 +266,7 @@ export function newId() {
 // Every saved copy of your data carries a version number. When an update changes how data is
 // saved, it adds a step here that converts the old format to the new one, and before any
 // conversion an exact copy of the old data is kept inside the app so it can be restored.
-export const DATA_VERSION = 5;
+export const DATA_VERSION = 6;
 
 const MIGRATIONS = {
   // v1 (Stage 1): only entries, categories and two settings. Everything added later starts empty.
@@ -285,6 +296,13 @@ const MIGRATIONS = {
   // v5 adds use counters (cost per use) and the subscription check-up date. Nothing existing
   // changes; the version marks that this data may hold them, and a copy of the v4 data is kept.
   4: (raw) => ({ ...raw, version: 5 }),
+  // v6: optional extras get on/off switches. Everything you already had stays on (gentle notes follow
+  // your old "advice notes" switch); the two new extras, split bills and cash, start off.
+  5: (raw) => {
+    const settings = { ...(raw.settings ?? {}) };
+    if (!settings.extras) settings.extras = { ...extrasAsBefore(), nudges: settings.adviceOn !== false };
+    return { ...raw, version: 6, settings };
+  },
 };
 
 export function savedVersion(raw) {

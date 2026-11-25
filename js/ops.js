@@ -59,6 +59,12 @@ export function updateEntry(state, entry, newId) {
   state.entries[i] = entry;
   // Changing a store's category teaches merchant memory the new one.
   if (entry.type !== 'saving') rememberMerchant(state, entry.name, entry.category, entry.type);
+  // A split bill: a repayment follows the bill (same owed amount), or goes if the bill isn't split any more.
+  const repay = state.entries.find((e) => e.type === 'repaid' && e.splitOf === entry.id);
+  if (repay) {
+    if (entry.type === 'expense' && entry.owed) Object.assign(repay, { cents: entry.owed, name: entry.name, category: entry.category });
+    else state.entries = state.entries.filter((e) => e !== repay);
+  }
   // Re-work this paycheck's savings with the plan it was saved with.
   const linked = state.entries.filter((e) => e.parentId === entry.id);
   state.entries = state.entries.filter((e) => e.parentId !== entry.id);
@@ -72,8 +78,21 @@ export function updateEntry(state, entry, newId) {
 }
 
 export function deleteEntry(state, id) {
-  state.entries = state.entries.filter((e) => e.id !== id && e.parentId !== id);
+  state.entries = state.entries.filter((e) => e.id !== id && e.parentId !== id && e.splitOf !== id);
   state.notice = state.notice.filter((n) => n !== id);
+}
+
+// ---------- Split bills ----------
+// "They paid me back": the friends' part comes back into your money (not income, not spending).
+export function markRepaid(state, billId, at, newId) {
+  const bill = state.entries.find((e) => e.id === billId);
+  if (!bill?.owed || state.entries.some((e) => e.type === 'repaid' && e.splitOf === billId)) return null;
+  const r = { id: newId(), type: 'repaid', name: bill.name, cents: bill.owed, at, category: bill.category, note: '', splitOf: billId, createdAt: new Date().toISOString() };
+  state.entries.push(r);
+  return r;
+}
+export function unmarkRepaid(state, billId) {
+  state.entries = state.entries.filter((e) => !(e.type === 'repaid' && e.splitOf === billId));
 }
 
 // Add everything that is now due. Returns the new main entries (for the welcome card).

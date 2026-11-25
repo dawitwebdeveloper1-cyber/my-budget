@@ -25,12 +25,12 @@ function sample() {
 // ---------- Spreadsheet ----------
 test('spreadsheet: every entry so far, in date order, exact amounts with signs', () => {
   const csv = toCSV(sample(), NOW);
-  assert.ok(csv.startsWith('﻿Date,Time,Type,Name,Category,Amount,Goal,Repeating,Note\r\n'));
+  assert.ok(csv.startsWith('﻿Date,Time,Type,Name,Category,Amount,Owed to you,Cash,Goal,Repeating,Note\r\n'));
   const lines = csv.slice(1).trim().split('\r\n');
   assert.equal(lines.length, 5, 'header + 4 entries (the future one is left out)');
-  assert.equal(lines[1], '2026-11-06,9:00 AM,Money in,Paycheck,Paycheck,1240.01,,,');
-  assert.equal(lines[2], '2026-11-07,10:00 AM,To savings,To Car,Savings,-0.05,Car,,');
-  assert.equal(lines[3], '2026-11-08,9:05 AM,Money out,"Coffee, large",Eating Out,-4.50,,,"with ""Sam"""');
+  assert.equal(lines[1], '2026-11-06,9:00 AM,Money in,Paycheck,Paycheck,1240.01,,,,,');
+  assert.equal(lines[2], '2026-11-07,10:00 AM,To savings,To Car,Savings,-0.05,,,Car,,');
+  assert.equal(lines[3], '2026-11-08,9:05 AM,Money out,"Coffee, large",Eating Out,-4.50,,,,,"with ""Sam"""');
 });
 
 test('spreadsheet: text that looks like a formula can never run', () => {

@@ -38,6 +38,15 @@ export async function readBackup(backup, secret) {
   }
 }
 
+// "Last backup: today / yesterday / 9 days ago".
+export function backupAge(lastBackupAt, now) {
+  const a = parseStamp(lastBackupAt ?? '');
+  const b = parseStamp(now);
+  if (!a || !b) return 'No backup yet';
+  const days = Math.floor((Date.UTC(b.y, b.m - 1, b.d) - Date.UTC(a.y, a.m - 1, a.d)) / 86400000);
+  return `Last backup: ${days <= 0 ? 'today' : days === 1 ? 'yesterday' : `${days} days ago`}`;
+}
+
 // Days since the last backup, or null if no reminder is needed.
 export function backupDue(settings, hasData, now) {
   if (!settings.backupReminder || !hasData) return null;

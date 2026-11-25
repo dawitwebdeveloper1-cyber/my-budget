@@ -16,6 +16,8 @@ import { openRuleSheet } from './reminders.js';
 import { openRecap } from './recap.js';
 import { openQuickAdd } from '../sheets/quick.js';
 
+const CHUNK = 120; // entries drawn at a time
+
 function activityPeriod(now) {
   const v = app.view;
   const at = v.anchor ?? now;
@@ -81,17 +83,33 @@ export function renderActivity(now, animate = false) {
   const body = [];
   if (!items.length) body.push(h('div', { class: `card${rv}` }, emptyState('list', 'Nothing here yet', 'Press and hold any entry later for quick options.',
     { label: 'Add an entry', run: () => openQuickAdd() })));
+  // Long lists load in pieces as you scroll, so even thousands of entries stay quick.
+  const list = h('div', {});
   let day = null;
   let group = null;
-  for (const it of items) {
-    if (dayKey(it.at) !== day) {
-      day = dayKey(it.at);
-      body.push(h('div', { class: 'day-head' }, formatDate(it.at, { weekday: true })));
-      group = h('div', { class: `card list${rv}` });
-      body.push(group);
+  let shown = 0;
+  const more = h('button', { class: 'link center-link load-more' });
+  const addChunk = () => {
+    const end = Math.min(items.length, shown + CHUNK);
+    for (; shown < end; shown++) {
+      const it = items[shown];
+      if (dayKey(it.at) !== day) {
+        day = dayKey(it.at);
+        list.append(h('div', { class: 'day-head' }, formatDate(it.at, { weekday: true })));
+        group = h('div', { class: `card list${shown < CHUNK ? rv : ''}` });
+        list.append(group);
+      }
+      group.append(it.entry ? entryRow(it.entry, now) : upcomingRow(it.rule, it.at));
     }
-    group.append(it.entry ? entryRow(it.entry, now) : upcomingRow(it.rule, it.at));
-  }
+    if (shown < items.length) more.textContent = `Show more (${items.length - shown} left)`;
+    else { more.remove(); observer?.disconnect(); }
+  };
+  more.addEventListener('click', addChunk);
+  const observer = typeof IntersectionObserver === 'function'
+    ? new IntersectionObserver((seen) => { if (seen.some((x) => x.isIntersecting)) addChunk(); }, { rootMargin: '600px' }) : null;
+  addChunk();
+  if (shown < items.length) { list.append(more); observer?.observe(more); }
+  if (items.length) body.push(list);
   return [seg, pager, snapshot, recap, totals, ...body];
 }
 
@@ -103,16 +121,18 @@ function mini(label, result, kind) {
 
 export function entryRow(e, now) {
   const future = e.at > now;
-  const kind = e.type === 'income' || e.type === 'refund' ? 'in' : e.type === 'saving' ? 'save' : 'out';
+  const kind = e.type === 'income' || e.type === 'refund' || e.type === 'repaid' ? 'in' : e.type === 'saving' ? 'save' : 'out';
+  const what = e.type === 'saving' ? 'Savings' : e.type === 'refund' ? `Refund · ${e.category}` : e.type === 'repaid' ? 'Paid back by friends' : e.category;
+  const extra = [e.owed ? `your share ${formatCents(e.cents - e.owed)}, ${formatCents(e.owed)} owed` : null, e.cash ? 'cash' : null].filter(Boolean).join(' · ');
   const meta = future ? `Counts from ${formatDateTime(e.at)}`
-    : `${e.type === 'saving' ? 'Savings' : e.type === 'refund' ? `Refund · ${e.category}` : e.category} · ${formatTime(e.at)}${e.recurringId ? ' · repeats' : ''}`;
+    : `${what} · ${formatTime(e.at)}${e.recurringId ? ' · repeats' : ''}${extra ? ` · ${extra}` : ''}`;
   const el = h('button', { class: `entry ${future ? 'future' : ''}`, onClick: () => openEntrySheet(e, {}, { from: el }) },
     h('div', {}, h('div', {}, e.name), h('div', { class: 'meta' }, meta)),
     money(signed(e), { kind }));
   // Press and hold: Edit, Duplicate, Delete
   onHold(el, () => {
     const auto = e.type === 'saving' && e.parentId;
-    const isMoney = e.type !== 'saving';
+    const isMoney = e.type !== 'saving' && e.type !== 'repaid';
     const fav = isMoney && isFavourite(app.state, e);
     const full = (app.state.favourites ?? []).length >= MAX_FAVOURITES;
     holdMenu(el, [

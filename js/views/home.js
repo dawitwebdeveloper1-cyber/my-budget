@@ -1,7 +1,9 @@
 import { h, s as svg, icon, openSheet } from '../ui.js';
-import { app, persist } from '../state.js';
-import { formatCents } from '../money.js';
-import { budgetMonth, shiftBudgetMonth, parseStamp } from '../dates.js';
+import { app, persist, change, newId } from '../state.js';
+import { formatCents, parseAmount } from '../money.js';
+import { budgetMonth, shiftBudgetMonth, parseStamp, nowStamp, formatDate } from '../dates.js';
+import { on, owedToYou, cashOnHand } from '../extras.js';
+import { markRepaid } from '../ops.js';
 import { monthSummary } from '../calc.js';
 import { categoryBudgets, weeklySnapshot, adviceNote, budgetProgress, casualStatus } from '../budget.js';
 import { money, howButton, openReceipt, UNVERIFIED, emptyState } from '../components.js';
@@ -92,19 +94,21 @@ export function renderHome(now, animate = false) {
     // The weekly backup, made and ready: one tap opens the phone's Save to Files screen.
     advice = h('button', { class: `advice action${rv}`, onClick: () => exportBackupNow() },
       h('span', {}, backupDays === Infinity ? 'Your first backup is ready. Tap to save it to Files.' : 'Your weekly backup is ready. Tap to save it.'), icon('right'));
-  } else if (st.settings.adviceOn) {
+  } else if (on(st, 'nudges') || on(st, 'weeklyWins')) {
     // Paycheck notes first (a much bigger paycheck than usual, a bonus-paycheck month), then spending.
-    const big2 = bigPaycheck(st, now);
-    const bonus = bonusHeadsUp(st, now);
+    // Each kind of note only shows when its extra is switched on (Settings → Extras).
+    const notes = on(st, 'nudges');
+    const big2 = notes ? bigPaycheck(st, now) : null;
+    const bonus = notes ? bonusHeadsUp(st, now) : null;
     const dismissed = st.dismissedAdvice;
-    const due = checkupDue(st, now);
-    const win = weeklyWin(st, now, st.settings.weekStartDay);
+    const due = notes ? checkupDue(st, now) : [];
+    const win = on(st, 'weeklyWins') ? weeklyWin(st, now, st.settings.weekStartDay) : null;
     const winNote = win && !dismissed.includes(win.key)
       ? { key: win.key, text: win.text, action: win.result ? (e) => openReceipt(win.result, e.currentTarget) : null }
       : null;
     const checkKey = `checkup:${now.slice(0, 10)}`; // "not now" hides it for today
     // Right after a win (at most every 3 months): "Know someone who'd like it?"
-    const askShare = !app.sample && shareAskDue(st, now)
+    const askShare = notes && !app.sample && shareAskDue(st, now)
       ? { key: 'share-ask', text: "Glad it's helping! Know someone who'd like My Budget? Tap to share it.",
         action: async () => { st.shareAskAt = now; persist(); app.render(); await shareApp(); },
         dismiss: () => { st.shareAskAt = now; } }
@@ -116,7 +120,7 @@ export function renderHome(now, animate = false) {
         : askShare ? askShare
         : due.length && !dismissed.includes(checkKey)
           ? { key: checkKey, text: due.length === 1 ? `Subscription check-up: still using ${due[0].name}?` : `Subscription check-up: still using these ${due.length}?`, action: () => openCheckup() }
-          : adviceNote({ budgets: categoryBudgets(st, period, now), summary: sum, snapshot, period, now, dismissed });
+          : notes ? adviceNote({ budgets: categoryBudgets(st, period, now), summary: sum, snapshot, period, now, dismissed }) : null;
     if (note?.action) {
       advice = h('div', { class: `advice${rv}`, role: 'note' },
         h('button', { class: 'advice-go press', onClick: note.action }, note.text),
@@ -131,45 +135,124 @@ export function renderHome(now, animate = false) {
   // ---- Month-end summary: offered for the first week of a new month
   const prev = shiftBudgetMonth(period, -1);
   const hadLastMonth = st.entries.some((e) => e.at >= prev.start && e.at < prev.end);
-  const recapLink = daysSince(period.start, now) < 7 && hadLastMonth
-    ? h('button', { class: `recap-link${rv}`, onClick: () => openRecap(prev, now) }, h('span', {}, `Your ${prev.short} recap`), icon('right'))
-    : null;
+  const recapDue = daysSince(period.start, now) < 7 && hadLastMonth;
 
-  // ---- Money in and money out, side by side
-  const pairCard = (label, result, kind, cls, ic) => h('button', {
-    class: `pair-card ${cls}${rv}`, disabled: !result.ok,
-    onClick: (e) => openReceipt(result, e.currentTarget),
-  },
-  h('span', { class: 'k' }, h('span', { class: `ic ${kind}` }, icon(ic)), label),
-  result.ok ? h('span', { class: `v num ${result.value === 0 ? '' : kind}` }, formatCents(result.value, { sign: 'always' })) : h('span', { class: 'unverified' }, 'Hidden'));
-  const pair = h('div', { class: 'pair' },
-    pairCard('Money in', sum.moneyIn, 'in', 'tint-sage', 'up'),
-    pairCard('Money out', sum.moneyOut, 'out', 'tint-peach', 'down'));
-
-  // ---- Carried over (its own line) and savings
-  const row = (label, result, kind) => h('button', { class: 'row', onClick: (e) => openReceipt(result, e.currentTarget.closest('.card')), disabled: !result.ok },
-    h('span', { class: 'name' }, h('span', {}, label)),
-    result.ok ? money(result.value, { kind: result.value === 0 ? 'zero' : kind }) : h('span', { class: 'unverified' }, 'Hidden'),
-    h('span', { class: 'how-ic', 'aria-label': 'Show me how' }, icon('receipt')));
-  const extra = h('section', { class: `card${rv}` },
-    h('div', { class: 'rows' },
-      lup.ok ? row(`What's left in ${period.short}`, sum.left, sum.left.value < 0 ? 'out' : 'in') : null,
-      row(`Carried over from ${sum.previousLabel}`, sum.carry, sum.carry.value < 0 ? 'out' : 'in'),
-      sum.saved.ok && sum.saved.value !== 0 ? row('Moved to savings', sum.saved, 'save') : null));
-
-  // ---- Decision tools, right under the main card
-  const tools = h('div', { class: `tools${rv}` },
+  // ---- Decision tools, right under the main card ("Can I afford it?" is a basic; what-if is an extra)
+  const tools = h('div', { class: `tools${on(st, 'whatIf') ? '' : ' single'}${rv}` },
     h('button', { class: 'tool press', onClick: (e) => openAfford(e.currentTarget) }, icon('receipt'), 'Can I afford it?'),
-    h('button', { class: 'tool press', onClick: (e) => openWhatIf(e.currentTarget) }, icon('leaf'), 'Try a what-if'));
+    on(st, 'whatIf') ? h('button', { class: 'tool press', onClick: (e) => openWhatIf(e.currentTarget) }, icon('leaf'), 'Try a what-if') : null);
 
   // Nothing logged yet: one friendly line and one button, instead of a page of zeros.
   if (!st.entries.some((e) => !e.auto && !e.parentId)) {
     const first = h('section', { class: `card${rv}` }, emptyState('plus', 'Nothing logged yet', 'Add what you spend as you go. It takes a few seconds.',
       { label: 'Add your first entry', run: () => openQuickAdd() }));
-    return [hero, first, tools, advice, extra];
+    return [hero, first, tools, advice];
   }
 
-  return [hero, tools, advice, recapLink, pair, extra, renderRing(sum, motion, rv)];
+  // ---- Keep Home calm: one big number, one note, and everything about the month one tap deeper.
+  const lines = h('div', { class: `rows home-rows${rv}` },
+    h('button', { class: 'row', onClick: (e) => openMonth(prev, recapDue, e.currentTarget) },
+      h('span', { class: 'name' }, h('span', {}, 'This month'), recapDue ? h('span', { class: 'row-sub faint small' }, `Your ${prev.short} recap is ready`) : null),
+      sum.moneyOut.ok ? money(sum.moneyOut.value, { kind: 'out' }) : null, icon('right')),
+    owedRow(st, now), cashRow(st, now));
+
+  return [hero, tools, advice, lines];
+}
+
+// Owed to you (the Split bills extra): one line, tap to mark bills paid back.
+function owedRow(st, now) {
+  if (!on(st, 'splits')) return null;
+  const o = owedToYou(st, now);
+  if (!o.ok || !o.value) return null;
+  return h('button', { class: 'row', onClick: (e) => openOwed(e.currentTarget) },
+    h('span', { class: 'name' }, h('span', {}, 'Owed to you'), h('span', { class: 'row-sub faint small' }, `${o.open.length} ${o.open.length === 1 ? 'bill' : 'bills'}`)),
+    money(o.value, { kind: 'in', plain: true }), icon('right'));
+}
+
+// Cash on hand (the Cash extra).
+function cashRow(st, now) {
+  if (!on(st, 'cash')) return null;
+  const c = cashOnHand(st, now);
+  return h('button', { class: 'row', onClick: (e) => openCash(e.currentTarget) },
+    h('span', { class: 'name' }, h('span', {}, 'Cash on hand')),
+    c?.ok ? money(c.value, { kind: c.value < 0 ? 'out' : 'in', plain: true }) : h('span', { class: 'faint small' }, 'Count it'), icon('right'));
+}
+
+// "This month": money in and out, what's left this month, carried over, savings, and categories.
+function openMonth(prev, recapDue, from) {
+  openSheet('This month', () => {
+    const st = app.state;
+    const now = nowStamp();
+    const period = budgetMonth(now, st.settings.monthStartDay);
+    const sum = monthSummary(st.entries, period, now);
+    const pairCard = (label, result, kind, cls, ic) => h('button', {
+      class: `pair-card ${cls}`, disabled: !result.ok,
+      onClick: (e) => openReceipt(result, e.currentTarget),
+    },
+    h('span', { class: 'k' }, h('span', { class: `ic ${kind}` }, icon(ic)), label),
+    result.ok ? h('span', { class: `v num ${result.value === 0 ? '' : kind}` }, formatCents(result.value, { sign: 'always' })) : h('span', { class: 'unverified' }, 'Hidden'));
+    const row = (label, result, kind) => h('button', { class: 'row', onClick: (e) => openReceipt(result, e.currentTarget.closest('.card')), disabled: !result.ok },
+      h('span', { class: 'name' }, h('span', {}, label)),
+      result.ok ? money(result.value, { kind: result.value === 0 ? 'zero' : kind }) : h('span', { class: 'unverified' }, 'Hidden'),
+      h('span', { class: 'how-ic', 'aria-label': 'Show me how' }, icon('receipt')));
+    return [
+      recapDue ? h('button', { class: 'recap-link', onClick: () => openRecap(prev, now) }, h('span', {}, `Your ${prev.short} recap`), icon('right')) : null,
+      h('div', { class: 'pair' },
+        pairCard('Money in', sum.moneyIn, 'in', 'tint-sage', 'up'),
+        pairCard('Money out', sum.moneyOut, 'out', 'tint-peach', 'down')),
+      h('section', { class: 'card' },
+        h('div', { class: 'rows' },
+          row(`What's left in ${period.short}`, sum.left, sum.left.value < 0 ? 'out' : 'in'),
+          row(`Carried over from ${sum.previousLabel}`, sum.carry, sum.carry.value < 0 ? 'out' : 'in'),
+          sum.saved.ok && sum.saved.value !== 0 ? row('Moved to savings', sum.saved, 'save') : null,
+          sum.owed.ok && sum.owed.value !== 0 ? row('Split bills (owed and paid back)', sum.owed, sum.owed.value < 0 ? 'out' : 'in') : null)),
+      renderRing(sum, false, ''),
+    ];
+  }, { from });
+}
+
+// The bills friends still owe you for, each with "Paid back".
+function openOwed(from) {
+  const sheet = openSheet('Owed to you', () => {
+    const o = owedToYou(app.state, nowStamp());
+    if (!o.ok) return h('p', { class: 'unverified' }, UNVERIFIED);
+    if (!o.open.length) return [h('p', { class: 'dim' }, 'Nobody owes you anything right now.'),
+      h('div', { class: 'actions' }, h('button', { class: 'btn primary', onClick: () => sheet.close() }, 'Done'))];
+    return [
+      h('div', { class: 'confirm-card' }, h('div', { class: 'big num in' }, formatCents(o.value)), h('div', { class: 'meta' }, 'owed to you'), howButton(o)),
+      ...o.open.map((e) => h('div', { class: 'use-row' },
+        h('div', {}, h('div', {}, e.name), h('div', { class: 'meta' }, `${formatCents(e.owed)} of ${formatCents(e.cents)} · ${formatDate(e.at, { weekday: true })}`)),
+        h('button', { class: 'btn primary narrow', onClick: () => { change((st) => markRepaid(st, e.id, nowStamp(), newId), `${e.name}: paid back ${formatCents(e.owed)}`); sheet.close(); } }, 'Paid back'))),
+      h('p', { class: 'faint small-note' }, 'When friends pay you back, it comes back into your money. It\'s not counted as income.'),
+    ];
+  }, { from });
+}
+
+// Cash on hand: what you counted last, minus cash spending since, plus cash coming in.
+function openCash(from) {
+  const d = { amount: '' };
+  let error = '';
+  const sheet = openSheet('Cash on hand', () => view(), { from });
+  function view() {
+    const c = cashOnHand(app.state, nowStamp());
+    return [
+      c ? h('div', { class: 'confirm-card' },
+        c.ok ? h('div', { class: 'big num' }, formatCents(c.value)) : h('p', { class: 'unverified' }, UNVERIFIED),
+        h('div', { class: 'meta' }, `Counted ${formatDate(app.state.settings.cash.at, { weekday: true })}${c.since ? `, then ${c.since} cash ${c.since === 1 ? 'entry' : 'entries'}` : ''}`),
+        c.ok ? howButton(c) : null) : h('p', { class: 'dim' }, 'Count the cash in your wallet once, and tag cash spending as you go ("Paid with cash"). This keeps the total for you.'),
+      h('label', { class: 'field' }, h('span', {}, c ? 'Count it again' : 'How much cash do you have?'),
+        h('div', { class: 'inline' },
+          h('div', { class: 'money-input grow' }, h('span', { class: 'cur' }, '$'), h('input', { class: 'input', inputmode: 'decimal', placeholder: '0.00', value: d.amount, onInput: (e) => { d.amount = e.target.value; } })),
+          h('button', { class: 'btn primary narrow', onClick: () => {
+            const raw = d.amount.trim();
+            const cents = raw === '0' || raw === '0.00' ? 0 : parseAmount(raw);
+            if (cents === null) { error = 'Enter an amount, like 45'; sheet.setContent(view()); return; }
+            change((st) => { st.settings.cash = { cents, at: nowStamp() }; }, `Cash on hand: ${formatCents(cents)}`);
+            sheet.close();
+          } }, 'Save'))),
+      error ? h('p', { class: 'error' }, error) : null,
+    ];
+  }
 }
 
 // Budget progress inside the main card: "53% of this month's budget used"
