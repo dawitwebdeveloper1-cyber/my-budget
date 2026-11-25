@@ -8,6 +8,7 @@ export const app = {
   view: { tab: 'home', mode: 'month', anchor: null },
   render: () => {},
   sample: false, // looking around with example data: nothing is saved
+  notify: (message, action) => toast(message, action), // the message with its Undo button (tests press it too)
 };
 
 // Saves on this device: encrypted once a passcode is set, never in plain form after that.
@@ -28,9 +29,9 @@ export function change(mutate, message, { undo = true } = {}) {
   persist();
   app.render();
   if (message) {
-    toast(message, undo ? {
+    app.notify(message, undo ? {
       label: 'Undo',
-      run: () => { app.state = before; persist(); app.render(); toast('Undone'); },
+      run: () => { app.state = before; persist(); app.render(); app.afterUndo?.(); app.notify('Undone'); },
     } : undefined);
   }
 }

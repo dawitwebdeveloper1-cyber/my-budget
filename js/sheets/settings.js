@@ -51,7 +51,8 @@ const saved = (msg = 'Saved') => toast(msg);
 export function openSettings(openSection = null, from = null) {
   const opened = new Set(openSection ? [openSection] : []);
   let logTime = null; // evening reminder time being picked (declared before the sheet draws)
-  const sheet = openSheet('Settings', () => body(), { from });
+  const sheet = openSheet('Settings', () => body(), { from, onClose: () => { app.afterUndo = null; } });
+  app.afterUndo = () => redraw(); // Undo from a Settings change redraws Settings too
 
   function redraw() { sheet.setContent(body()); }
 
@@ -120,8 +121,7 @@ export function openSettings(openSection = null, from = null) {
           }
           const total = next.reduce((a, p) => a + p.bp, 0);
           if (total > 10000) { autoErr.textContent = `That adds up to ${formatPercent(total)}. Keep it at 100% or less.`; return; }
-          change((x) => { x.settings.autoSave = next; }, null);
-          saved(total ? `Auto-save: ${formatPercent(total)} of each paycheck` : 'Auto-save off');
+          change((x) => { x.settings.autoSave = next; }, total ? `Auto-save: ${formatPercent(total)} of each paycheck` : 'Auto-save off');
           redraw();
         } }, 'Save auto-save'))
       : h('div', { class: 'field' }, h('span', {}, 'Auto-save from each paycheck'), h('p', { class: 'faint small-note' }, 'Create a savings goal in the Goals tab first.'));
@@ -136,10 +136,10 @@ export function openSettings(openSection = null, from = null) {
       catList('expense', 'Spending categories and limits'),
       catList('income', 'Income categories'),
       line('Budget month starts on the', select(Array.from({ length: 31 }, (_, i) => [i + 1, ordinal(i + 1)]), st.monthStartDay, (v) => {
-        change((x) => { x.settings.monthStartDay = Number(v); }, null); saved(); redraw();
+        change((x) => { x.settings.monthStartDay = Number(v); }, 'Saved'); redraw();
       }, 'Budget month start day'), st.monthStartDay > 28 ? 'In shorter months it starts on the last day.' : null),
       line('Week starts on', select([1, 2, 3, 4, 5, 6, 0].map((d) => [d, DAY_NAMES[d]]), st.weekStartDay, (v) => {
-        change((x) => { x.settings.weekStartDay = Number(v); }, null); saved(); redraw();
+        change((x) => { x.settings.weekStartDay = Number(v); }, 'Saved'); redraw();
       }, 'Week start day')),
     ];
   }
@@ -189,7 +189,7 @@ export function openSettings(openSection = null, from = null) {
   // ---------- Alerts ----------
   function alerts() {
     const st = app.state.settings;
-    const setS = (k, v) => { change((x) => { x.settings[k] = v; }, null); saved(); redraw(); };
+    const setS = (k, v) => { change((x) => { x.settings[k] = v; }, 'Saved'); redraw(); };
     return [
       line('First alert', select(ALERT_DAY_OPTIONS, st.alertDays, (v) => setS('alertDays', Number(v)), 'First alert')),
       line('Second alert', select(ALERT_MIN_OPTIONS, st.alertMinutes, (v) => setS('alertMinutes', Number(v)), 'Second alert')),
@@ -261,7 +261,7 @@ export function openSettings(openSection = null, from = null) {
     const bioMsg = h('p', { class: 'error' });
     return [
       h('p', { class: 'faint small-note' }, 'Your data is encrypted on this phone.'),
-      line('Lock when I leave the app', select(LOCK_CHOICES, app.state.settings.lockAfter, (v) => { change((x) => { x.settings.lockAfter = Number(v); }, null); saved(); redraw(); }, 'Lock timer')),
+      line('Lock when I leave the app', select(LOCK_CHOICES, app.state.settings.lockAfter, (v) => { change((x) => { x.settings.lockAfter = Number(v); }, 'Saved'); redraw(); }, 'Lock timer')),
       bioAvailable() ? line('Unlock with Face ID', toggle(bioEnabled(), async (on) => {
         if (on) {
           const r = await enableBio();
@@ -293,7 +293,7 @@ export function openSettings(openSection = null, from = null) {
         h('button', { class: 'btn primary', onClick: async () => { if (await exportBackupNow()) redraw(); } }, 'Export backup'),
         h('button', { class: 'btn ghost', onClick: () => openBackupCheck() }, 'Check a backup works'),
         h('button', { class: 'btn ghost', onClick: () => file.click() }, 'Restore from a backup'), file),
-      line('Weekly backup', toggle(st.backupReminder, (on) => { change((x) => { x.settings.backupReminder = on; }, null); saved(); redraw(); }, 'Weekly backup'),
+      line('Weekly backup', toggle(st.backupReminder, (on) => { change((x) => { x.settings.backupReminder = on; }, 'Saved'); redraw(); }, 'Weekly backup'),
         'Once a week, Home has your backup ready to save in one tap.'),
       h('button', { class: 'btn ghost', onClick: () => exportSpreadsheet() }, 'Export a spreadsheet (all entries)'),
       h('button', { class: 'btn ghost', onClick: addBackupReminder }, 'Add weekly reminder to Calendar'),

@@ -1,0 +1,11 @@
+#!/bin/sh
+# Runs every test before anything is published (pushed to GitHub). If one fails, nothing is pushed.
+echo "Running all tests before publishing..."
+npm test --silent > /tmp/my-budget-tests.log 2>&1
+status=$?
+grep -E "^ℹ (tests|pass|fail)" /tmp/my-budget-tests.log
+if [ $status -ne 0 ]; then
+  echo "Tests failed, so nothing was published. Details:"
+  grep -E "^✖|AssertionError" /tmp/my-budget-tests.log | head -20
+  exit 1
+fi
