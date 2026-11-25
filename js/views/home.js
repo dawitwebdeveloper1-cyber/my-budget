@@ -18,6 +18,7 @@ import { openAfford, openWhatIf } from '../sheets/decide.js';
 import { checkupDue } from '../decide.js';
 import { weeklyWin } from '../habits.js';
 import { openQuickAdd } from '../sheets/quick.js';
+import { exportBackupNow } from '../sheets/backup.js';
 import { openCheckup } from './reminders.js';
 
 // animate: true when the Home screen opens (count-up, progress fill, chart draw-in).
@@ -87,8 +88,9 @@ export function renderHome(now, animate = false) {
     advice = h('button', { class: `advice action${rv}`, onClick: () => openPasscodeSetup() },
       h('span', {}, "Your data isn't locked yet. Set a passcode to encrypt it."), icon('right'));
   } else if (backupDays !== null) {
-    advice = h('button', { class: `advice action${rv}`, onClick: () => openSettings('backup') },
-      h('span', {}, backupDays === Infinity ? "You haven't made a backup yet. Tap to save one." : `It's been ${backupDays} days since your last backup. Tap to save one.`), icon('right'));
+    // The weekly backup, made and ready: one tap opens the phone's Save to Files screen.
+    advice = h('button', { class: `advice action${rv}`, onClick: () => exportBackupNow() },
+      h('span', {}, backupDays === Infinity ? 'Your first backup is ready. Tap to save it to Files.' : 'Your weekly backup is ready. Tap to save it.'), icon('right'));
   } else if (st.settings.adviceOn) {
     // Paycheck notes first (a much bigger paycheck than usual, a bonus-paycheck month), then spending.
     const big2 = bigPaycheck(st, now);

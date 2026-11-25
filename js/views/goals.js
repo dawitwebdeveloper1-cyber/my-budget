@@ -179,9 +179,16 @@ export function openGoalSheet(goal, from = null, prefill = 0) {
   if (goal && prefill) { d.add = centsToInput(prefill).replace(/\.00$/, ''); sheet.setContent(view()); }
 
   function confirmDelete() {
+    const p = goalProgress(goal, app.state.entries, nowStamp());
+    const held = p.ok ? p.value : 0;
     sheet.setTitle('Delete this goal?');
     sheet.setContent(
-      h('p', { class: 'dim' }, `"${goal.name}" will be removed. Money already moved to savings stays in your records.`),
+      held > 0 ? h('div', { class: 'confirm-card' },
+        h('div', { class: 'big num' }, formatCents(held)),
+        h('div', { class: 'meta' }, `is saved in ${goal.name}`)) : null,
+      h('p', { class: 'dim' }, held > 0
+        ? `"${goal.name}" will be removed, and its auto-save stops. The ${formatCents(held)} you moved there stays in your history as savings, just not tied to a goal. You can undo this for a few seconds after.`
+        : `"${goal.name}" will be removed. You can undo this for a few seconds after.`),
       h('div', { class: 'actions' },
         h('button', { class: 'btn primary', onClick: () => { change((s) => deleteGoal(s, goal.id), 'Goal deleted'); sheet.close(); } }, 'Delete goal'),
         h('button', { class: 'btn ghost', onClick: () => { sheet.setTitle(goal.name); sheet.setContent(view()); } }, 'Keep it')));

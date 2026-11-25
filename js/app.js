@@ -18,6 +18,7 @@ import { openCheckin } from './sheets/checkin.js';
 import { paydayCheckin, streak, streakText } from './habits.js';
 import { needsSetup, renderSetup } from './views/setup.js';
 import { sampleState } from './sample.js';
+import { lockDelayMs } from './trust.js';
 import { openSettings } from './sheets/settings.js';
 
 const TABS = [
@@ -154,7 +155,7 @@ document.addEventListener('visibilitychange', () => {
   if (document.hidden) { hiddenAt = Date.now(); return; }
   const away = hiddenAt ? Date.now() - hiddenAt : 0;
   hiddenAt = null;
-  if (hasVault() && isUnlocked() && away > 60_000) lockNow();
+  if (hasVault() && isUnlocked() && away >= lockDelayMs(app.state.settings)) lockNow();
   else catchUp();
 });
 

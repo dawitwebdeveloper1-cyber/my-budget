@@ -449,6 +449,10 @@ html.big-text body { zoom: var(--text-scale, 1); }
 .tool svg { width: 17px; height: 17px; flex: none; color: var(--label); }
 .afford { margin-top: 8px; padding: 18px; border-radius: 22px; background: var(--surface); box-shadow: var(--shadow); }
 .afford .verdict { font-size: 28px; font-weight: 800; letter-spacing: -0.01em; }
+.verdict.ok { font-size: 22px; font-weight: 800; color: var(--in); margin-bottom: 4px; }
+.set-privacy { display: flex; justify-content: space-between; align-items: center; gap: 10px; width: 100%; padding: 16px 18px; margin-top: 4px; border-radius: 22px; background: var(--surface); box-shadow: var(--shadow); text-align: left; }
+.set-privacy svg { width: 16px; height: 16px; color: var(--label); flex: none; }
+.facts.privacy { font-size: 15px; color: var(--text); line-height: 1.5; }
 .afford.yes .verdict { color: var(--in); }
 .afford.notyet .verdict { color: var(--out); }
 .afford-text { font-size: 16px; line-height: 1.5; margin: 6px 0 10px; }

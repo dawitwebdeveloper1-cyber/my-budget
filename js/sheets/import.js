@@ -3,7 +3,7 @@
 import { h, icon, openSheet, toast } from '../ui.js';
 import { app, change, newId } from '../state.js';
 import { formatCents } from '../money.js';
-import { formatDate } from '../dates.js';
+import { formatDate, nowStamp } from '../dates.js';
 import { addEntry } from '../ops.js';
 import {
   parseCSV, detectLayout, readTransactions, signExample, dedupe, importKey, guessCategory, cleanDescription, toISODate, dateParts,
@@ -201,6 +201,9 @@ export function openImport(from = null) {
   function save(chosen) {
     const profile = { roles: opts.roles, dateOrder: opts.dateOrder, signMode: opts.signMode };
     sheet.close();
+    // Every entry from this import shares a batch id, so the whole import can be undone later too
+    // (Settings → Money → Bank file), not only in the 5 seconds after.
+    const batch = newId();
     change((st) => {
       st.importProfiles ??= {};
       st.importProfiles[layout.signature] = profile;
@@ -208,9 +211,10 @@ export function openImport(from = null) {
         addEntry(st, {
           id: newId(), type: x.type, name: x.name, cents: x.t.cents, at: `${x.t.date}T12:00`,
           category: x.category, note: '', createdAt: new Date().toISOString(),
-          imported: true, importKey: importKey(x.t),
+          imported: true, importKey: importKey(x.t), importBatch: batch,
         }, newId);
       }
+      st.lastImport = { batch, count: chosen.length, at: nowStamp() };
     }, `Imported ${chosen.length} ${chosen.length === 1 ? 'entry' : 'entries'}`);
   }
 

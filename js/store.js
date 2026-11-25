@@ -28,6 +28,8 @@ export const DEFAULT_SETTINGS = {
   lastBackupAt: null,
   logReminder: null,      // "20:00": the evening "Log today?" calendar reminder you added (null = none)
   setupDone: false,       // the quick first-time setup was finished or skipped
+  lockAfter: 1,           // minutes in the background before the passcode is asked again (0 = right away)
+  backupChecked: false,   // a backup file has been checked (opened and compared) at least once
 };
 
 export function freshState() {
@@ -45,6 +47,7 @@ export function freshState() {
     importProfiles: {},   // bank file layouts you've answered questions about, so we only ask once
     dismissedAdvice: [],
     lastCheckin: null,    // the paycheck whose payday check-in was already shown
+    lastImport: null,     // { batch, count, at }: the last bank import, so it can be undone as a whole
     categories: structuredClone(DEFAULT_CATEGORIES),
     settings: { ...DEFAULT_SETTINGS },
   };
@@ -106,6 +109,8 @@ export function cleanEntry(e) {
   if (e.imported === true) out.imported = true;
   const ik = optStr(e.importKey, 200);
   if (ik) out.importKey = ik;
+  const ib = optStr(e.importBatch, 64);
+  if (ib) out.importBatch = ib;
   if (Number.isSafeInteger(e.hours) && e.hours > 0 && Number.isSafeInteger(e.rateCents) && e.rateCents > 0) {
     out.hours = e.hours;
     out.rateCents = e.rateCents;
@@ -207,6 +212,8 @@ export function cleanState(raw) {
   if (Array.isArray(raw.notice)) s.notice = raw.notice.filter((x) => typeof x === 'string').slice(0, 500);
   if (Array.isArray(raw.dismissedAdvice)) s.dismissedAdvice = raw.dismissedAdvice.filter((x) => typeof x === 'string').slice(-200);
   if (typeof raw.lastCheckin === 'string') s.lastCheckin = raw.lastCheckin.slice(0, 64);
+  const li = raw.lastImport;
+  if (li && typeof li.batch === 'string' && Number.isInteger(li.count) && isStamp(li.at)) s.lastImport = { batch: li.batch.slice(0, 64), count: li.count, at: li.at };
 
   const st = raw.settings ?? {};
   const t = s.settings;
@@ -222,6 +229,8 @@ export function cleanState(raw) {
   if (typeof st.backupReminder === 'boolean') t.backupReminder = st.backupReminder;
   if (isStamp(st.lastBackupAt)) t.lastBackupAt = st.lastBackupAt;
   if (st.setupDone === true) t.setupDone = true;
+  if ([0, 1, 5, 15].includes(st.lockAfter)) t.lockAfter = st.lockAfter;
+  if (st.backupChecked === true) t.backupChecked = true;
   if (typeof st.logReminder === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(st.logReminder)) t.logReminder = st.logReminder;
   return s;
 }

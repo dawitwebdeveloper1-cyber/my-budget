@@ -6,8 +6,8 @@ import { nowStamp, formatDate, parseStamp, addDays, weekday, makeStamp } from '.
 import { FREQS, ALERT_DAY_OPTIONS, ALERT_MIN_OPTIONS, nextOccurrence, alertTriggers } from '../recurring.js';
 import { parsePercent, formatPercent } from '../budget.js';
 import { activeRules, renameCategory, deleteCategory, addCategory, PAYCHECK } from '../ops.js';
-import { hasVault, bioEnabled, bioAvailable, enableBio, disableBio, backupParts, adoptBackup } from '../vault.js';
-import { makeBackup, parseBackup, readBackup } from '../backup.js';
+import { hasVault, bioEnabled, bioAvailable, enableBio, disableBio, adoptBackup } from '../vault.js';
+import { parseBackup, readBackup } from '../backup.js';
 import { listCopies, restoreCopy } from '../store.js';
 import { isPersisted, flushStorage } from '../storage.js';
 import { openPasscodeSetup, openChangePasscode, openNewRecoveryKey } from '../lock.js';
@@ -17,6 +17,8 @@ import { openImport } from './import.js';
 import { openPaySetup } from './paysetup.js';
 import { payRule } from '../pay.js';
 import { addToCalendar } from '../calendar.js';
+import { exportBackupNow, openBackupCheck, exportSpreadsheet, openPrivacy } from './backup.js';
+import { LOCK_CHOICES, undoImport } from '../trust.js';
 
 const pad = (n) => String(n).padStart(2, '0');
 const ordinal = (n) => {
@@ -67,6 +69,8 @@ export function openSettings(openSection = null, from = null) {
       ...(app.sample ? [h('p', { class: 'faint small-note' }, 'Passcode and backup are off while you look around with example data.')] : [
         section('security', 'Security', hasVault() ? `Passcode on${bioEnabled() ? ' · Face ID on' : ''}` : 'No passcode yet', security),
         section('backup', 'Backup', st.lastBackupAt ? `Last backup ${formatDate(st.lastBackupAt, { year: true })}` : 'No backup yet', backup)]),
+      h('button', { class: 'set-privacy', onClick: (e) => openPrivacy(e.currentTarget) },
+        h('span', {}, h('b', {}, 'Your privacy'), h('span', { class: 'faint small' }, ' · your data stays on your phone')), icon('right')),
     ];
   }
 
@@ -117,7 +121,8 @@ export function openSettings(openSection = null, from = null) {
     return [
       h('div', { class: 'field' }, h('span', {}, 'Bank file'),
         h('div', { class: 'rows' }, h('button', { class: 'row', onClick: () => openImport() },
-          h('span', { class: 'name' }, h('span', {}, 'Import from your bank (CSV)')), icon('right')))),
+          h('span', { class: 'name' }, h('span', {}, 'Import from your bank (CSV)')), icon('right')),
+          lastImportRow())),
       h('div', { class: 'field' }, h('span', {}, 'Your pay'), h('div', { class: 'rows' }, payLine)),
       auto,
       catList('expense', 'Spending categories and limits'),
@@ -219,6 +224,24 @@ export function openSettings(openSection = null, from = null) {
     redraw();
   }
 
+  // The last bank import can be taken back as a whole, with a short confirm first.
+  function lastImportRow() {
+    const li = app.state.lastImport;
+    const count = li ? app.state.entries.filter((e) => e.importBatch === li.batch).length : 0;
+    if (!li || !count) return null;
+    return h('button', { class: 'row', onClick: () => {
+      const cs = openSheet('Undo the last import?', () => [
+        h('div', { class: 'confirm-card' },
+          h('div', { class: 'big num' }, String(count)),
+          h('div', { class: 'what' }, `${count === 1 ? 'entry' : 'entries'} imported ${formatDate(li.at, { weekday: true })}`)),
+        h('p', { class: 'dim' }, 'They\'ll be removed together, including any you changed since. Everything you added yourself stays.'),
+        h('div', { class: 'actions' },
+          h('button', { class: 'btn primary', onClick: () => { change((s) => undoImport(s, li.batch), `Removed ${count} imported ${count === 1 ? 'entry' : 'entries'}`); cs.close(); redraw(); } }, `Remove ${count} ${count === 1 ? 'entry' : 'entries'}`),
+          h('button', { class: 'btn ghost', onClick: () => cs.close() }, 'Keep them')),
+      ]);
+    } }, h('span', { class: 'name' }, h('span', {}, `Undo the last import (${count} ${count === 1 ? 'entry' : 'entries'})`)), icon('right'));
+  }
+
   // ---------- Security ----------
   function security() {
     if (!hasVault()) {
@@ -229,7 +252,8 @@ export function openSettings(openSection = null, from = null) {
     }
     const bioMsg = h('p', { class: 'error' });
     return [
-      h('p', { class: 'faint small-note' }, 'Your data is encrypted on this phone. It locks when you leave the app for more than a minute.'),
+      h('p', { class: 'faint small-note' }, 'Your data is encrypted on this phone.'),
+      line('Lock when I leave the app', select(LOCK_CHOICES, app.state.settings.lockAfter, (v) => { change((x) => { x.settings.lockAfter = Number(v); }, null); saved(); redraw(); }, 'Lock timer')),
       bioAvailable() ? line('Unlock with Face ID', toggle(bioEnabled(), async (on) => {
         if (on) {
           const r = await enableBio();
@@ -258,10 +282,12 @@ export function openSettings(openSection = null, from = null) {
         : 'Saves everything into one file. Set a passcode first if you want the file encrypted.'),
       h('p', { class: 'faint small-note' }, st.lastBackupAt ? `Last backup: ${formatDate(st.lastBackupAt, { weekday: true, year: true })}` : 'No backup yet.'),
       h('div', { class: 'actions' },
-        h('button', { class: 'btn primary', onClick: exportBackup }, 'Export backup'),
-        h('button', { class: 'btn ghost', onClick: () => file.click() }, 'Import backup'), file),
-      line('Weekly backup reminder', toggle(st.backupReminder, (on) => { change((x) => { x.settings.backupReminder = on; }, null); saved(); redraw(); }, 'Weekly backup reminder'),
-        'A gentle line in the app after 7 days.'),
+        h('button', { class: 'btn primary', onClick: async () => { if (await exportBackupNow()) redraw(); } }, 'Export backup'),
+        h('button', { class: 'btn ghost', onClick: () => openBackupCheck() }, 'Check a backup works'),
+        h('button', { class: 'btn ghost', onClick: () => file.click() }, 'Restore from a backup'), file),
+      line('Weekly backup', toggle(st.backupReminder, (on) => { change((x) => { x.settings.backupReminder = on; }, null); saved(); redraw(); }, 'Weekly backup'),
+        'Once a week, Home has your backup ready to save in one tap.'),
+      h('button', { class: 'btn ghost', onClick: () => exportSpreadsheet() }, 'Export a spreadsheet (all entries)'),
       h('button', { class: 'btn ghost', onClick: addBackupReminder }, 'Add weekly reminder to Calendar'),
       h('p', { class: 'faint small-note' }, isPersisted()
         ? 'This phone is set to keep My Budget\'s data, even when storage runs low.'
@@ -280,37 +306,6 @@ export function openSettings(openSection = null, from = null) {
         h('button', { class: 'btn primary', onClick: async () => { await restoreCopy(copy.key); await flushStorage(); location.reload(); } }, 'Restore and restart'),
         h('button', { class: 'btn ghost', onClick: () => cs.close() }, 'Cancel')),
     ]);
-  }
-
-  async function exportBackup() {
-    const parts = backupParts();
-    const b = await makeBackup({ state: app.state, vault: hasVault() ? parts.vault : null, dataKey: parts.dataKey });
-    const text = JSON.stringify(b);
-    const name = `my-budget-backup-${nowStamp().slice(0, 10)}.json`;
-    const blob = new Blob([text], { type: 'application/json' });
-    let done = false;
-    try {
-      const f = new File([blob], name, { type: 'application/json' });
-      if (navigator.canShare?.({ files: [f] })) {
-        await navigator.share({ files: [f], title: 'My Budget backup' });
-        done = true;
-      }
-    } catch (e) {
-      if (e?.name === 'AbortError') return; // cancelled: not backed up
-    }
-    if (!done) {
-      const url = URL.createObjectURL(blob);
-      const a = h('a', { href: url, download: name });
-      document.body.append(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 10_000);
-    }
-    app.state.settings.lastBackupAt = nowStamp();
-    persist();
-    saved('Backup saved');
-    redraw();
-    app.render();
   }
 
   async function importFile(f) {
@@ -348,13 +343,16 @@ export function openSettings(openSection = null, from = null) {
       h('p', { class: 'dim' }, 'Everything currently in My Budget on this phone will be replaced by this backup.'),
       h('div', { class: 'actions' },
         h('button', { class: 'btn primary', onClick: async () => {
-          if (!hasVault() && b.encrypted && opened?.dataKey) await adoptBackup(b, opened.dataKey, r.state);
+          const adopting = !hasVault() && b.encrypted && opened?.dataKey;
+          const before = app.state;
+          if (adopting) await adoptBackup(b, opened.dataKey, r.state);
           app.state = r.state;
           persist();
           cs.close();
           sheet.close();
           app.render();
-          toast('Backup restored');
+          // Undo puts back what was here (not offered when restoring also turned on the backup's passcode).
+          toast('Backup restored', adopting ? undefined : { label: 'Undo', run: () => { app.state = before; persist(); app.render(); toast('Undone'); } });
         } }, 'Replace with backup'),
         h('button', { class: 'btn ghost', onClick: () => cs.close() }, 'Cancel')),
     ]);
