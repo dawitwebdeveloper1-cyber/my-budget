@@ -19,6 +19,8 @@ import { payRule } from '../pay.js';
 import { addToCalendar } from '../calendar.js';
 import { exportBackupNow, openBackupCheck, exportSpreadsheet, openPrivacy } from './backup.js';
 import { LOCK_CHOICES, undoImport } from '../trust.js';
+import { openStory, openFeedback, shareApp } from './about.js';
+import { APP_VERSION, FEEDBACK_EMAIL } from '../config.js';
 
 const pad = (n) => String(n).padStart(2, '0');
 const ordinal = (n) => {
@@ -71,6 +73,12 @@ export function openSettings(openSection = null, from = null) {
         section('backup', 'Backup', st.lastBackupAt ? `Last backup ${formatDate(st.lastBackupAt, { year: true })}` : 'No backup yet', backup)]),
       h('button', { class: 'set-privacy', onClick: (e) => openPrivacy(e.currentTarget) },
         h('span', {}, h('b', {}, 'Your privacy'), h('span', { class: 'faint small' }, ' · your data stays on your phone')), icon('right')),
+      FEEDBACK_EMAIL ? h('button', { class: 'set-privacy', onClick: () => openFeedback() },
+        h('span', {}, h('b', {}, 'Tell me what to fix'), h('span', { class: 'faint small' }, ' · I read every message')), icon('right')) : null,
+      h('button', { class: 'set-privacy', onClick: () => shareApp() },
+        h('span', {}, h('b', {}, 'Share My Budget with a friend')), icon('right')),
+      h('button', { class: 'set-privacy', onClick: (e) => openStory(e.currentTarget) },
+        h('span', {}, h('b', {}, 'Made by a Calgary high schooler'), h('span', { class: 'faint small' }, ` · version ${APP_VERSION}`)), icon('right')),
     ];
   }
 

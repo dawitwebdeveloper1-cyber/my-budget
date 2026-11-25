@@ -168,6 +168,13 @@ export function weeklyWin(state, now, weekStart = 1) {
   return null;
 }
 
+// ---------- "Know someone who'd like it?" ----------
+// Only in the 2 days after a win, and at most once every 3 months.
+export function shareAskDue(state, now) {
+  if (!state.winAt || dayNum(now) - dayNum(state.winAt) > 2 || state.winAt > now) return false;
+  return !state.shareAskAt || dayNum(now) - dayNum(state.shareAskAt) >= 90;
+}
+
 // ---------- Monthly recap extras ----------
 // Best week: the full week inside the month with the least spending (only weeks you logged in).
 export function bestWeek(state, period, now, weekStart = 1) {

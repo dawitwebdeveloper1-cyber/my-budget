@@ -19,6 +19,8 @@ import { paydayCheckin, streak, streakText } from './habits.js';
 import { needsSetup, renderSetup } from './views/setup.js';
 import { sampleState } from './sample.js';
 import { lockDelayMs } from './trust.js';
+import { openShareCard, milestoneOf } from './sharecard.js';
+import { whatsNewDue, openWhatsNew } from './sheets/about.js';
 import { openSettings } from './sheets/settings.js';
 
 const TABS = [
@@ -74,6 +76,7 @@ function render(animate = false) {
   ].filter(Boolean));
   if (animate) reveal(root);
   celebrate();
+  milestones();
 }
 app.render = () => render(false);
 
@@ -112,11 +115,29 @@ function celebrate() {
   const fresh = reached.filter((id) => !before.includes(id));
   if (!fresh.length && reached.length === before.length) return;
   st.celebrated = reached;
+  if (fresh.length) st.winAt = now; // a win: the right moment to suggest sharing the app
   persist();
   if (fresh.length) {
     confetti();
     const g = st.goals.find((x) => x.id === fresh[0]);
-    if (g && !document.querySelector('.toast')) toast(`You reached ${g.name}!`);
+    if (g && !document.querySelector('.toast')) toast(`You reached ${g.name}!`, { label: 'Share', run: () => openShareCard(g) });
+  }
+}
+
+// 25%, 50% and 75% of a goal: a small note, with a picture card to share if you like.
+function milestones() {
+  const st = app.state;
+  if (app.sample) return;
+  const now = nowStamp();
+  const current = Object.fromEntries(st.goals.map((g) => [g.id, milestoneOf(goalProgress(g, st.entries, now))]));
+  if (st.milestones === null) { st.milestones = current; persist(); return; } // first run: no surprise notes
+  const up = st.goals.find((g) => current[g.id] > (st.milestones[g.id] ?? 0) && current[g.id] < 100);
+  const changed = JSON.stringify(current) !== JSON.stringify(st.milestones);
+  st.milestones = current;
+  if (changed) persist();
+  if (up && !document.querySelector('.toast')) {
+    const m = current[up.id];
+    toast(m === 50 ? `${up.name} is halfway there!` : `${up.name} is ${m}% there!`, { label: 'Share', run: () => openShareCard(up) });
   }
 }
 
@@ -130,6 +151,7 @@ function catchUp(animate = false) {
   const checkin = paydayCheckin(app.state, nowStamp());
   if (checkin) openCheckin(checkin);
   else if (app.state.notice.length) openWelcome();
+  else if (animate) { const news = whatsNewDue(app.state); if (news) openWhatsNew(news); } // once after an update
 }
 
 function start(state) {

@@ -30,6 +30,7 @@ export const DEFAULT_SETTINGS = {
   setupDone: false,       // the quick first-time setup was finished or skipped
   lockAfter: 1,           // minutes in the background before the passcode is asked again (0 = right away)
   backupChecked: false,   // a backup file has been checked (opened and compared) at least once
+  seenVersion: null,      // the app version whose "What's new" was already shown
 };
 
 export function freshState() {
@@ -48,6 +49,9 @@ export function freshState() {
     dismissedAdvice: [],
     lastCheckin: null,    // the paycheck whose payday check-in was already shown
     lastImport: null,     // { batch, count, at }: the last bank import, so it can be undone as a whole
+    milestones: {},       // goal id → highest milestone already noted (25, 50, 75, 100)
+    winAt: null,          // when the last win happened (a goal reached, a better paycheck)
+    shareAskAt: null,     // when "Share My Budget?" was last asked (at most every 3 months)
     categories: structuredClone(DEFAULT_CATEGORIES),
     settings: { ...DEFAULT_SETTINGS },
   };
@@ -212,6 +216,12 @@ export function cleanState(raw) {
   if (Array.isArray(raw.notice)) s.notice = raw.notice.filter((x) => typeof x === 'string').slice(0, 500);
   if (Array.isArray(raw.dismissedAdvice)) s.dismissedAdvice = raw.dismissedAdvice.filter((x) => typeof x === 'string').slice(-200);
   if (typeof raw.lastCheckin === 'string') s.lastCheckin = raw.lastCheckin.slice(0, 64);
+  // Older saved data has no milestone list yet: null means "note the current ones quietly".
+  s.milestones = raw.milestones && typeof raw.milestones === 'object' && !Array.isArray(raw.milestones)
+    ? Object.fromEntries(Object.entries(raw.milestones).filter(([k, v]) => typeof k === 'string' && [0, 25, 50, 75, 100].includes(v)).slice(0, 200))
+    : null;
+  if (isStamp(raw.winAt)) s.winAt = raw.winAt;
+  if (isStamp(raw.shareAskAt)) s.shareAskAt = raw.shareAskAt;
   const li = raw.lastImport;
   if (li && typeof li.batch === 'string' && Number.isInteger(li.count) && isStamp(li.at)) s.lastImport = { batch: li.batch.slice(0, 64), count: li.count, at: li.at };
 
@@ -231,6 +241,7 @@ export function cleanState(raw) {
   if (st.setupDone === true) t.setupDone = true;
   if ([0, 1, 5, 15].includes(st.lockAfter)) t.lockAfter = st.lockAfter;
   if (st.backupChecked === true) t.backupChecked = true;
+  if (typeof st.seenVersion === 'string' && /^[\w.-]{1,20}$/.test(st.seenVersion)) t.seenVersion = st.seenVersion;
   if (typeof st.logReminder === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(st.logReminder)) t.logReminder = st.logReminder;
   return s;
 }

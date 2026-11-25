@@ -8,6 +8,7 @@ import { cleanGoal } from '../store.js';
 import { money, howButton, bar, receiptBody, UNVERIFIED, emptyState } from '../components.js';
 import { reducedMotion } from '../motion.js';
 import { goalForecast, forecastText } from '../decide.js';
+import { openShareCard } from '../sharecard.js';
 
 export function renderGoals(now, animate = false) {
   const st = app.state;
@@ -85,7 +86,8 @@ export function openGoalSheet(goal, from = null, prefill = 0) {
         h('div', { class: 'meta' }, `saved of ${formatCents(goal.targetCents)}`),
         bar(p.percent, { gold: true }),
         h('div', { class: 'meta' }, p.reached ? 'Goal reached' : `${formatCents(p.toGo)} to go`),
-        howButton(p)) : h('p', { class: 'unverified' }, UNVERIFIED),
+        howButton(p),
+        p.reached || p.percent >= 25 ? h('button', { class: 'how', onClick: (e) => openShareCard(goal, e.currentTarget) }, icon('up'), 'Share a picture card') : null) : h('p', { class: 'unverified' }, UNVERIFIED),
       etaLine(),
 
       h('label', { class: 'field' }, h('span', {}, 'Add money to this goal'),

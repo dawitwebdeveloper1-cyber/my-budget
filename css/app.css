@@ -453,6 +453,9 @@ html.big-text body { zoom: var(--text-scale, 1); }
 .set-privacy { display: flex; justify-content: space-between; align-items: center; gap: 10px; width: 100%; padding: 16px 18px; margin-top: 4px; border-radius: 22px; background: var(--surface); box-shadow: var(--shadow); text-align: left; }
 .set-privacy svg { width: 16px; height: 16px; color: var(--label); flex: none; }
 .facts.privacy { font-size: 15px; color: var(--text); line-height: 1.5; }
+.set-privacy + .set-privacy { margin-top: 10px; }
+.story p { font-size: 17px; line-height: 1.55; margin: 0 0 12px; }
+.share-card { display: block; width: 62%; max-width: 260px; height: auto; aspect-ratio: 9 / 16; margin: 0 auto 14px; border-radius: 18px; box-shadow: var(--shadow-lift); }
 .afford.yes .verdict { color: var(--in); }
 .afford.notyet .verdict { color: var(--out); }
 .afford-text { font-size: 16px; line-height: 1.5; margin: 6px 0 10px; }

@@ -16,7 +16,13 @@ export function openCheckin(ci) {
   const p = ci.paycheck;
   const skip = new Set([p.id, ...ci.saved.map((e) => e.id)]);
   const others = s.notice.map((id) => s.entries.find((e) => e.id === id)).filter((e) => e && !skip.has(e.id));
-  const done = () => { app.state.lastCheckin = p.id; app.state.notice = []; persist(); open = false; };
+  const done = () => {
+    app.state.lastCheckin = p.id;
+    app.state.notice = [];
+    if (ci.compare?.receipt) app.state.winAt = p.at > (app.state.winAt ?? '') ? p.at : app.state.winAt; // spent less: a win
+    persist();
+    open = false;
+  };
 
   const sheet = openSheet('Payday check-in', () => [
     h('div', { class: 'confirm-card' },

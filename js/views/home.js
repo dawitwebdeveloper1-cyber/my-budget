@@ -16,7 +16,8 @@ import { leftUntilPayday, bigPaycheck, bonusHeadsUp } from '../pay.js';
 import { openGoalSheet } from './goals.js';
 import { openAfford, openWhatIf } from '../sheets/decide.js';
 import { checkupDue } from '../decide.js';
-import { weeklyWin } from '../habits.js';
+import { weeklyWin, shareAskDue } from '../habits.js';
+import { shareApp } from '../sheets/about.js';
 import { openQuickAdd } from '../sheets/quick.js';
 import { exportBackupNow } from '../sheets/backup.js';
 import { openCheckup } from './reminders.js';
@@ -102,17 +103,24 @@ export function renderHome(now, animate = false) {
       ? { key: win.key, text: win.text, action: win.result ? (e) => openReceipt(win.result, e.currentTarget) : null }
       : null;
     const checkKey = `checkup:${now.slice(0, 10)}`; // "not now" hides it for today
+    // Right after a win (at most every 3 months): "Know someone who'd like it?"
+    const askShare = !app.sample && shareAskDue(st, now)
+      ? { key: 'share-ask', text: "Glad it's helping! Know someone who'd like My Budget? Tap to share it.",
+        action: async () => { st.shareAskAt = now; persist(); app.render(); await shareApp(); },
+        dismiss: () => { st.shareAskAt = now; } }
+      : null;
     const note = big2 && !dismissed.includes(big2.key)
       ? { key: big2.key, text: `This paycheck is ${formatCents(big2.extra)} more than usual. Put some toward a goal?`, action: () => openGoalSheet(st.goals[0] ?? null, null, big2.extra) }
       : bonus && !dismissed.includes(bonus.key) ? bonus
         : winNote ? winNote
+        : askShare ? askShare
         : due.length && !dismissed.includes(checkKey)
           ? { key: checkKey, text: due.length === 1 ? `Subscription check-up: still using ${due[0].name}?` : `Subscription check-up: still using these ${due.length}?`, action: () => openCheckup() }
           : adviceNote({ budgets: categoryBudgets(st, period, now), summary: sum, snapshot, period, now, dismissed });
     if (note?.action) {
       advice = h('div', { class: `advice${rv}`, role: 'note' },
         h('button', { class: 'advice-go press', onClick: note.action }, note.text),
-        h('button', { class: 'advice-x', 'aria-label': 'Dismiss note', onClick: () => { st.dismissedAdvice.push(note.key); persist(); app.render(); } }, icon('close')));
+        h('button', { class: 'advice-x', 'aria-label': 'Not now', onClick: () => { if (note.dismiss) note.dismiss(); else st.dismissedAdvice.push(note.key); persist(); app.render(); } }, icon('close')));
     } else if (note) {
       advice = h('div', { class: `advice${rv}`, role: 'note' },
         h('span', {}, note.text),

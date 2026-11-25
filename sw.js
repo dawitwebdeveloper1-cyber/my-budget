@@ -1,7 +1,7 @@
 // Lets the app open with no internet. Only caches the app's own files – never your data.
 // Network first, so updates published to GitHub show up the next time you open the app online.
 
-const CACHE = 'my-budget-v19';
+const CACHE = 'my-budget-v20';
 const FILES = [
   './',
   './index.html',
@@ -51,6 +51,9 @@ const FILES = [
   './js/views/setup.js',
   './js/trust.js',
   './js/sheets/backup.js',
+  './js/config.js',
+  './js/sharecard.js',
+  './js/sheets/about.js',
   './icons/icon-192.png',
   './icons/icon-512.png',
   './icons/apple-touch-icon.png',
