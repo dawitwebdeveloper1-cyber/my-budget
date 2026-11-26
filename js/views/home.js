@@ -352,7 +352,8 @@ function renderRing(sum, motion, rv) {
   if (motion) countUp(totalEl, total, (v) => formatCents(v), { duration: Math.min(1000, step * cats.length + 300) });
   else totalEl.textContent = formatCents(total);
   const ring = h('div', { class: 'ring' },
-    svg('svg', { viewBox: '0 0 200 200', role: 'img', 'aria-label': `Spending by category, ${formatCents(total)} in total` },
+    // Screen readers hear every slice: "Spending by category: Groceries $64.50, Eating Out $10.00. Total $74.50."
+    svg('svg', { viewBox: '0 0 200 200', role: 'img', 'aria-label': `Spending by category: ${cats.map((c) => `${c.category} ${formatCents(c.value)}`).join(', ')}. Total ${formatCents(total)}.` },
       svg('circle', { cx: CX, cy: CX, r: R, fill: 'none', stroke: 'var(--track)', 'stroke-width': W }), ...segs),
     h('div', { class: 'center' }, h('div', {}, h('small', {}, 'Spent'), totalEl)));
   ring.querySelector('circle').style.stroke = 'var(--track)';

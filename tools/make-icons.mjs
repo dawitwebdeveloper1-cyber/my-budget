@@ -10,9 +10,9 @@ mkdirSync(out, { recursive: true });
 
 // ---------- Design (on a 512 × 512 grid) ----------
 const C = {
-  bg: '#2C3035',      // the app's charcoal
-  bar: '#56626E',     // soft slate bars
-  line: '#A3CDB8',    // the app's "money in" green
+  bg: '#2F4A3A',      // Calm forest: the app's deep forest green
+  bar: '#5E8069',     // lighter forest bars
+  line: '#F4F2EC',    // the app's warm cream background, for the rising line and dot
 };
 const SIZE = 512;
 const CORNER = 112;

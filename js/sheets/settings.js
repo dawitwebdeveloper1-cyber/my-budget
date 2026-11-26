@@ -28,6 +28,8 @@ const ordinal = (n) => {
   if (n % 100 >= 11 && n % 100 <= 13) return `${n}th`;
   return `${n}${{ 1: 'st', 2: 'nd', 3: 'rd' }[n % 10] ?? 'th'}`;
 };
+const MODE_NAMES = { system: 'System', light: 'Light', dark: 'Dark' };
+const PALETTE_NAMES = { forest: 'Calm forest', charcoal: 'Warm charcoal', navy: 'Trust navy', plum: 'Soft plum' };
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const hourLabel = (hh) => `${hh % 12 === 0 ? 12 : hh % 12}:00 ${hh < 12 ? 'AM' : 'PM'}`;
 
@@ -71,6 +73,7 @@ export function openSettings(openSection = null, from = null) {
       section('money', 'Money', 'Pay, categories, auto-save, month and week', money),
       section('alerts', 'Alerts', `Calendar alerts${st.logReminder ? ', evening reminder' : ''}`, alerts),
       section('extras', 'Extras', extrasSummary(), extras),
+      section('appearance', 'Appearance', appearanceSummary(), appearance),
       ...(app.sample ? [h('p', { class: 'faint small-note' }, 'Passcode and backup are off while you look around with example data.')] : [
         section('security', 'Security', hasVault() ? `Passcode on${bioEnabled() ? ' · Face ID on' : ''}` : 'No passcode yet', security),
         section('backup', 'Backup', backupAge(st.lastBackupAt, nowStamp()), backup)]),
@@ -198,6 +201,31 @@ export function openSettings(openSection = null, from = null) {
       line('Reminder time for bills', select(Array.from({ length: 17 }, (_, i) => [i + 6, hourLabel(i + 6)]), st.eventHour, (v) => setS('eventHour', Number(v)), 'Reminder time')),
       h('p', { class: 'faint small-note' }, 'Applies to calendar reminders you add from now on. To update one you already added, tap it in Reminders and add it again.'),
       ...logReminder(),
+    ];
+  }
+
+  // ---------- Appearance ----------
+  // Mode (System / Light / Dark) and colour palette. Saved on this phone; applied before the page draws.
+  function appearanceSummary() {
+    const a = window.myBudgetAppearance?.get() ?? { mode: 'system', palette: 'forest' };
+    return `${MODE_NAMES[a.mode]} · ${PALETTE_NAMES[a.palette]}`;
+  }
+  function appearance() {
+    const ap = window.myBudgetAppearance;
+    if (!ap) return [h('p', { class: 'faint small-note' }, 'Appearance settings need a refresh of the app.')];
+    const a = ap.get();
+    const set = (change) => { ap.set(change); redraw(); };
+    return [
+      h('div', { class: 'field' }, h('span', {}, 'Mode'),
+        h('div', { class: 'seg', role: 'group', 'aria-label': 'Mode' },
+          ap.MODES.map((m) => h('button', { 'aria-pressed': String(a.mode === m), onClick: () => set({ mode: m }) }, MODE_NAMES[m])))),
+      h('div', { class: 'field' }, h('span', {}, 'Colour palette'),
+        h('div', { class: 'palettes', role: 'radiogroup', 'aria-label': 'Colour palette' },
+          ap.PALETTES.map((p) => h('button', {
+            class: 'palette', role: 'radio', 'aria-checked': String(a.palette === p), 'data-p': p,
+            onClick: () => set({ palette: p }),
+          }, h('span', { class: 'swatch-big', 'aria-hidden': 'true' }, a.palette === p ? icon('check') : null), h('span', {}, PALETTE_NAMES[p]))))),
+      h('p', { class: 'faint small-note' }, 'Money in stays green and money out stays clay red in every palette.'),
     ];
   }
 
